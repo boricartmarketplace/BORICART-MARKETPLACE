@@ -1,0 +1,123 @@
+{
+  "entities": {
+    "Product": {
+      "title": "Product",
+      "description": "Boricart consumer product entity",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string", "maxLength": 200 },
+        "slug": { "type": "string", "maxLength": 200 },
+        "sku": { "type": "string", "maxLength": 50 },
+        "shortDescription": { "type": "string", "maxLength": 500 },
+        "description": { "type": "string", "maxLength": 10000 },
+        "regularPrice": { "type": "number" },
+        "promotionalPrice": { "type": "number" },
+        "categoryId": { "type": "string", "maxLength": 100 },
+        "categoryName": { "type": "string", "maxLength": 100 },
+        "tags": { "type": "array" },
+        "mainImage": { "type": "string", "maxLength": 2000 },
+        "images": { "type": "array" },
+        "stockQuantity": { "type": "number" },
+        "stockStatus": { "type": "string", "enum": ["in_stock", "low_stock", "out_of_stock"] },
+        "specifications": { "type": "string", "maxLength": 5000 },
+        "usageInstructions": { "type": "string", "maxLength": 5000 },
+        "status": { "type": "string", "enum": ["draft", "published"] },
+        "isFeatured": { "type": "boolean" },
+        "isBestSeller": { "type": "boolean" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["name", "slug", "regularPrice", "categoryId", "status", "stockQuantity"]
+    },
+    "Category": {
+      "title": "Category",
+      "description": "Product category entity",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string", "maxLength": 100 },
+        "slug": { "type": "string", "maxLength": 100 },
+        "description": { "type": "string", "maxLength": 500 },
+        "image": { "type": "string", "maxLength": 2000 },
+        "productCount": { "type": "number" },
+        "sortOrder": { "type": "number" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["name", "slug"]
+    },
+    "Order": {
+      "title": "Order",
+      "description": "Customer order entity for Cash on Delivery",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "orderNumber": { "type": "string", "maxLength": 50 },
+        "customerName": { "type": "string", "maxLength": 150 },
+        "phone": { "type": "string", "maxLength": 30 },
+        "email": { "type": "string", "maxLength": 150 },
+        "state": { "type": "string", "maxLength": 100 },
+        "city": { "type": "string", "maxLength": 100 },
+        "deliveryAddress": { "type": "string", "maxLength": 500 },
+        "items": { "type": "array" },
+        "subtotal": { "type": "number" },
+        "deliveryFee": { "type": "number" },
+        "totalAmount": { "type": "number" },
+        "paymentMethod": { "type": "string", "enum": ["cash_on_delivery"] },
+        "paymentStatus": { "type": "string", "enum": ["unpaid", "paid"] },
+        "status": { "type": "string", "enum": ["pending", "confirmed", "processing", "shipped", "out_for_delivery", "delivered", "cancelled", "failed_delivery"] },
+        "notes": { "type": "string", "maxLength": 1000 },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["customerName", "phone", "state", "city", "deliveryAddress", "items", "totalAmount", "status", "paymentMethod"]
+    },
+    "Settings": {
+      "title": "Settings",
+      "description": "Store settings entity",
+      "type": "object",
+      "properties": {
+        "whatsappNumber": { "type": "string", "maxLength": 30 },
+        "storeName": { "type": "string", "maxLength": 100 },
+        "supportEmail": { "type": "string", "maxLength": 100 },
+        "supportPhone": { "type": "string", "maxLength": 30 },
+        "deliveryFee": { "type": "number" },
+        "freeDeliveryThreshold": { "type": "number" },
+        "updatedAt": { "type": "string" }
+      }
+    },
+    "Admin": {
+      "title": "Admin",
+      "description": "Administrator record",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string", "maxLength": 150 },
+        "role": { "type": "string", "enum": ["admin", "superadmin"] },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["email", "role"]
+    }
+  },
+  "firestore": {
+    "/products/{productId}": {
+      "schema": { "$ref": "#/entities/Product" },
+      "description": "Boricart catalog products"
+    },
+    "/categories/{categoryId}": {
+      "schema": { "$ref": "#/entities/Category" },
+      "description": "Product categories"
+    },
+    "/orders/{orderId}": {
+      "schema": { "$ref": "#/entities/Order" },
+      "description": "Orders placed by customers"
+    },
+    "/settings/{settingId}": {
+      "schema": { "$ref": "#/entities/Settings" },
+      "description": "Store configuration and WhatsApp number"
+    },
+    "/admins/{adminId}": {
+      "schema": { "$ref": "#/entities/Admin" },
+      "description": "Authorized administrators"
+    }
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "name": "Boricart",
+  "description": "Everyday Solutions. Better Living. Premium Nigerian ecommerce store with Cash on Delivery and direct WhatsApp support.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
