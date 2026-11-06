@@ -1,4 +1,4 @@
-import { Product, Category, CollectionItem, StoreSettings } from '../types';
+import { Product, Category, CollectionItem, StoreSettings, AdminUser } from '../types';
 
 export const INITIAL_CATEGORIES: Category[] = [
   {

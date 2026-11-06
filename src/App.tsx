@@ -184,6 +184,7 @@ function MainApp() {
       case 'contact':
         return (
           <ContactPage
+            settings={settings}
             whatsappNumber={settings.whatsappNumber}
             supportEmail={settings.supportEmail}
           />
@@ -192,6 +193,7 @@ function MainApp() {
       case 'about':
         return (
           <AboutPage
+            settings={settings}
             onNavigate={handleNavigate}
             whatsappNumber={settings.whatsappNumber}
           />
@@ -200,6 +202,7 @@ function MainApp() {
       case 'delivery-policy':
         return (
           <PolicyPages
+            settings={settings}
             initialPolicy="delivery"
             onNavigate={handleNavigate}
             whatsappNumber={settings.whatsappNumber}
@@ -209,6 +212,7 @@ function MainApp() {
       case 'terms':
         return (
           <PolicyPages
+            settings={settings}
             initialPolicy="terms"
             onNavigate={handleNavigate}
             whatsappNumber={settings.whatsappNumber}
@@ -218,6 +222,7 @@ function MainApp() {
       case 'privacy':
         return (
           <PolicyPages
+            settings={settings}
             initialPolicy="privacy"
             onNavigate={handleNavigate}
             whatsappNumber={settings.whatsappNumber}
@@ -267,6 +272,7 @@ function MainApp() {
           currentRoute={currentRoute}
           onNavigate={handleNavigate}
           whatsappNumber={settings.whatsappNumber}
+          settings={settings}
         />
       )}
 

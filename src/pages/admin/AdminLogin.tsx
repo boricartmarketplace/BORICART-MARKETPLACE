@@ -1,37 +1,86 @@
 import React, { useState } from 'react';
-import { Lock, ShieldCheck, ArrowRight, AlertCircle, Sparkles } from 'lucide-react';
+import { Lock, ShieldCheck, AlertCircle, UserPlus, LogIn, Mail, Key, User, Briefcase } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { AdminRole } from '../../types';
 
 interface AdminLoginProps {
   onNavigate: (page: string, params?: Record<string, any>) => void;
 }
 
 export const AdminLogin: React.FC<AdminLoginProps> = ({ onNavigate }) => {
-  const { loginWithGoogle, loginDemoAdmin, isAdmin, isLoading } = useAuth();
+  const { loginWithGoogle, loginWithEmailPassword, registerWithEmailPassword, loginDemoAdmin } = useAuth();
+  
+  const [mode, setMode] = useState<'login' | 'register'>('login');
   const [error, setError] = useState<string | null>(null);
-  const [isSigningIn, setIsSigningIn] = useState(false);
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Form fields
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [selectedRole, setSelectedRole] = useState<AdminRole>('overall_admin');
+
+  // Handle Google Auth
   const handleGoogleSignIn = async () => {
     setError(null);
-    setIsSigningIn(true);
+    setIsSubmitting(true);
     try {
       await loginWithGoogle();
       onNavigate('admin-dashboard');
     } catch (err: any) {
       console.error(err);
-      setError('Unable to authenticate with Google. You can also use the Authorized Admin Session button below.');
+      setError(err?.message || 'Unable to authenticate with Google. You can use Email/Password or Instant Access below.');
     } finally {
-      setIsSigningIn(false);
+      setIsSubmitting(false);
     }
   };
 
-  const handleDemoAdmin = () => {
-    loginDemoAdmin();
+  // Handle Email/Password Form Submit
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    setSuccessMsg(null);
+    setIsSubmitting(true);
+
+    try {
+      if (mode === 'register') {
+        if (!name.trim()) throw new Error('Please enter your full name');
+        if (!email.trim()) throw new Error('Please enter your email address');
+        if (password.length < 6) throw new Error('Password must be at least 6 characters long');
+
+        await registerWithEmailPassword(name, email, password, selectedRole);
+        setSuccessMsg('Account registered and role privileges activated!');
+        setTimeout(() => {
+          onNavigate('admin-dashboard');
+        }, 600);
+      } else {
+        if (!email.trim() || !password) throw new Error('Please provide both email and password');
+        await loginWithEmailPassword(email, password);
+        onNavigate('admin-dashboard');
+      }
+    } catch (err: any) {
+      console.error(err);
+      let msg = err.message || 'Authentication failed. Please verify credentials.';
+      if (err.code === 'auth/email-already-in-use') {
+        msg = 'This email is already registered. Please sign in instead.';
+      } else if (err.code === 'auth/wrong-password' || err.code === 'auth/user-not-found' || err.code === 'auth/invalid-credential') {
+        msg = 'Invalid email or password. Please verify your credentials or register.';
+      }
+      setError(msg);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Instant demo access
+  const handleQuickAccess = (role: AdminRole = 'overall_admin') => {
+    loginDemoAdmin(role);
     onNavigate('admin-dashboard');
   };
 
   return (
-    <div className="min-h-[70vh] flex items-center justify-center px-4 py-12">
+    <div className="min-h-[75vh] flex items-center justify-center px-4 py-12">
       <div className="max-w-md w-full bg-white rounded-3xl border border-gray-100 shadow-xl p-8 sm:p-10 space-y-6">
         {/* Brand Header */}
         <div className="text-center space-y-3">
@@ -44,9 +93,13 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({ onNavigate }) => {
               />
             </div>
           </div>
-          <h1 className="text-xl font-black text-[#333333]">Administrator Portal</h1>
+          <h1 className="text-xl font-black text-[#333333]">
+            {mode === 'register' ? 'Register Admin Staff' : 'Administrator Portal'}
+          </h1>
           <p className="text-xs text-gray-500">
-            Authorized management backend for products, categories, orders, and store settings.
+            {mode === 'register'
+              ? 'Create a secure staff account with role-based access privileges.'
+              : 'Authorized management backend for products, orders, delivery, and store content.'}
           </p>
         </div>
 
@@ -54,10 +107,40 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({ onNavigate }) => {
         <div className="bg-emerald-50 border border-emerald-200/80 rounded-2xl p-3 flex items-center gap-2.5 text-xs text-emerald-900 font-semibold">
           <ShieldCheck className="w-5 h-5 text-emerald-600 shrink-0" />
           <div className="flex-1">
-            <span className="font-bold text-emerald-950 block">Firebase Active & Secured</span>
-            <span className="text-[11px] text-emerald-700">Firestore Database: ai-studio-boricart</span>
+            <span className="font-bold text-emerald-950 block">Firebase Auth & Database Active</span>
+            <span className="text-[11px] text-emerald-700">Role-Based Access Control Enabled</span>
           </div>
           <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+        </div>
+
+        {/* Mode Toggle Tabs (Login vs Register) */}
+        <div className="flex rounded-xl bg-gray-100 p-1">
+          <button
+            type="button"
+            onClick={() => {
+              setMode('login');
+              setError(null);
+            }}
+            className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 ${
+              mode === 'login' ? 'bg-white text-gray-900 shadow-xs' : 'text-gray-500 hover:text-gray-800'
+            }`}
+          >
+            <LogIn className="w-3.5 h-3.5" />
+            <span>Admin Login</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setMode('register');
+              setError(null);
+            }}
+            className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 ${
+              mode === 'register' ? 'bg-white text-gray-900 shadow-xs' : 'text-gray-500 hover:text-gray-800'
+            }`}
+          >
+            <UserPlus className="w-3.5 h-3.5" />
+            <span>Register Admin</span>
+          </button>
         </div>
 
         {error && (
@@ -67,12 +150,122 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({ onNavigate }) => {
           </div>
         )}
 
-        <div className="space-y-4 pt-1">
-          {/* Sign in with Google */}
+        {successMsg && (
+          <div className="p-3.5 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs rounded-xl flex items-start gap-2">
+            <ShieldCheck className="w-4 h-4 shrink-0 mt-0.5 text-emerald-600" />
+            <span>{successMsg}</span>
+          </div>
+        )}
+
+        {/* Email & Password Authentication Form */}
+        <form onSubmit={handleSubmit} className="space-y-4">
+          {mode === 'register' && (
+            <div>
+              <label className="block text-xs font-bold text-gray-700 mb-1">Full Name</label>
+              <div className="relative">
+                <input
+                  type="text"
+                  required
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="e.g. Adebayo Olumide"
+                  className="w-full text-xs bg-gray-50 border border-gray-200 rounded-xl pl-9 pr-3 py-2.5 focus:bg-white focus:outline-none focus:border-[#F5A623]"
+                />
+                <User className="w-4 h-4 text-gray-400 absolute left-3 top-3" />
+              </div>
+            </div>
+          )}
+
+          <div>
+            <label className="block text-xs font-bold text-gray-700 mb-1">Email Address</label>
+            <div className="relative">
+              <input
+                type="email"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="admin@boricart.com"
+                className="w-full text-xs bg-gray-50 border border-gray-200 rounded-xl pl-9 pr-3 py-2.5 focus:bg-white focus:outline-none focus:border-[#F5A623]"
+              />
+              <Mail className="w-4 h-4 text-gray-400 absolute left-3 top-3" />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-gray-700 mb-1">Password</label>
+            <div className="relative">
+              <input
+                type="password"
+                required
+                minLength={6}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••"
+                className="w-full text-xs bg-gray-50 border border-gray-200 rounded-xl pl-9 pr-3 py-2.5 focus:bg-white focus:outline-none focus:border-[#F5A623]"
+              />
+              <Key className="w-4 h-4 text-gray-400 absolute left-3 top-3" />
+            </div>
+            {mode === 'register' && (
+              <span className="text-[10px] text-gray-400 mt-1 block">Minimum 6 characters</span>
+            )}
+          </div>
+
+          {mode === 'register' && (
+            <div>
+              <label className="block text-xs font-bold text-gray-700 mb-1">
+                Access Privilege & Role
+              </label>
+              <div className="relative">
+                <select
+                  value={selectedRole}
+                  onChange={(e) => setSelectedRole(e.target.value as AdminRole)}
+                  className="w-full text-xs bg-gray-50 border border-gray-200 rounded-xl pl-9 pr-3 py-2.5 focus:bg-white focus:outline-none focus:border-[#F5A623] font-semibold text-gray-800"
+                >
+                  <option value="overall_admin">👑 Overall Admin (Full Access: CMS, Staff, Catalog, Orders)</option>
+                  <option value="store_keeper">📦 Store Keeper (Catalog, Stock Levels, Pricing)</option>
+                  <option value="order_dispatcher">🚚 Order Dispatcher (Order Fulfillment, Delivery)</option>
+                </select>
+                <Briefcase className="w-4 h-4 text-gray-400 absolute left-3 top-3" />
+              </div>
+            </div>
+          )}
+
           <button
+            type="submit"
+            disabled={isSubmitting}
+            className="w-full bg-[#F5A623] hover:bg-[#D98200] text-white font-bold py-3.5 px-4 rounded-xl shadow-xs transition-all flex items-center justify-center gap-2 text-xs sm:text-sm cursor-pointer disabled:opacity-50"
+          >
+            {isSubmitting ? (
+              <span>Processing...</span>
+            ) : mode === 'register' ? (
+              <>
+                <UserPlus className="w-4 h-4" />
+                <span>Create Admin Account</span>
+              </>
+            ) : (
+              <>
+                <LogIn className="w-4 h-4" />
+                <span>Sign In with Email</span>
+              </>
+            )}
+          </button>
+        </form>
+
+        <div className="relative flex py-1 items-center">
+          <div className="flex-grow border-t border-gray-200"></div>
+          <span className="flex-shrink mx-4 text-[11px] font-semibold text-gray-400 uppercase">
+            Or Choose Authentication Method
+          </span>
+          <div className="flex-grow border-t border-gray-200"></div>
+        </div>
+
+        {/* Social / Direct Options */}
+        <div className="space-y-2.5">
+          <button
+            type="button"
             onClick={handleGoogleSignIn}
-            disabled={isSigningIn}
-            className="w-full bg-white hover:bg-gray-50 text-gray-800 font-bold py-3.5 px-4 border border-gray-300 rounded-xl shadow-xs transition-all flex items-center justify-center gap-3 text-sm disabled:opacity-50 cursor-pointer"
+            disabled={isSubmitting}
+            className="w-full bg-white hover:bg-gray-50 text-gray-800 font-bold py-3 px-4 border border-gray-300 rounded-xl shadow-xs transition-all flex items-center justify-center gap-3 text-xs disabled:opacity-50 cursor-pointer"
           >
             <svg className="w-4 h-4" viewBox="0 0 24 24">
               <path
@@ -92,30 +285,22 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({ onNavigate }) => {
                 d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
               />
             </svg>
-            <span>{isSigningIn ? 'Signing in with Google...' : 'Sign In with Authorized Google Account'}</span>
+            <span>Sign In with Google</span>
           </button>
 
-          <div className="relative flex py-2 items-center">
-            <div className="flex-grow border-t border-gray-200"></div>
-            <span className="flex-shrink mx-4 text-xs font-semibold text-gray-400 uppercase">
-              Or Instant Admin Session
-            </span>
-            <div className="flex-grow border-t border-gray-200"></div>
-          </div>
-
-          {/* Quick Access for Admin */}
           <button
-            onClick={handleDemoAdmin}
-            className="w-full bg-[#F5A623] hover:bg-[#D98200] text-white font-bold py-3.5 px-4 rounded-xl shadow-xs transition-all flex items-center justify-center gap-2 text-sm cursor-pointer"
+            type="button"
+            onClick={() => handleQuickAccess('overall_admin')}
+            className="w-full bg-amber-50 hover:bg-amber-100 text-amber-950 font-bold py-2.5 px-4 rounded-xl border border-amber-200 transition-all flex items-center justify-center gap-2 text-xs cursor-pointer"
           >
-            <ShieldCheck className="w-4 h-4" />
-            <span>Launch Boricart Admin Dashboard</span>
+            <ShieldCheck className="w-3.5 h-3.5 text-[#F5A623]" />
+            <span>Instant Access: Overall Admin (boricartmarketplace@gmail.com)</span>
           </button>
         </div>
 
-        <div className="pt-4 border-t border-gray-100 text-center">
+        <div className="pt-3 border-t border-gray-100 text-center">
           <p className="text-[11px] text-gray-400">
-            Designated Administrator: <strong className="text-gray-700">boricartmarketplace@gmail.com</strong>
+            Designated Overall Admin: <strong className="text-gray-700">boricartmarketplace@gmail.com</strong>
           </p>
           <button
             onClick={() => onNavigate('home')}

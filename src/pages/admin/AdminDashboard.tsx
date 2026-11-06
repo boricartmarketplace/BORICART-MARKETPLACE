@@ -24,9 +24,15 @@ import {
   Image as ImageIcon,
   Layout,
   RefreshCw,
+  Users,
+  FileText,
+  ShieldCheck,
+  Truck,
+  MessageSquare,
+  Building,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
-import { Product, Category, Order, OrderStatus, PaymentStatus, StoreSettings } from '../../types';
+import { Product, Category, Order, OrderStatus, PaymentStatus, StoreSettings, AdminRole } from '../../types';
 import {
   formatNaira,
   saveProduct,
@@ -41,6 +47,8 @@ import {
 import { ProductFormModal } from './ProductFormModal';
 import { CategoryFormModal } from './CategoryFormModal';
 import { OrderDetailsModal } from './OrderDetailsModal';
+import { StaffManagementTab } from './StaffManagementTab';
+import { PagesCmsTab } from './PagesCmsTab';
 
 interface AdminDashboardProps {
   products: Product[];
@@ -51,6 +59,8 @@ interface AdminDashboardProps {
   onNavigate: (page: string, params?: Record<string, any>) => void;
 }
 
+type TabType = 'overview' | 'products' | 'categories' | 'orders' | 'pages-cms' | 'staff' | 'settings';
+
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   products,
   categories,
@@ -59,8 +69,29 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   onRefreshData,
   onNavigate,
 }) => {
-  const { user, logout } = useAuth();
-  const [activeTab, setActiveTab] = useState<'overview' | 'products' | 'categories' | 'orders' | 'settings'>('overview');
+  const { user, logout, adminRole, staffUser, switchRole } = useAuth();
+  const [activeTab, setActiveTab] = useState<TabType>('overview');
+
+  // Role permissions:
+  // - overall_admin: all tabs
+  // - store_keeper: overview, products, categories
+  // - order_dispatcher: overview, orders
+  const allowedTabs = useMemo(() => {
+    if (adminRole === 'store_keeper') {
+      return ['overview', 'products', 'categories'] as TabType[];
+    }
+    if (adminRole === 'order_dispatcher') {
+      return ['overview', 'orders'] as TabType[];
+    }
+    return ['overview', 'products', 'categories', 'orders', 'pages-cms', 'staff', 'settings'] as TabType[];
+  }, [adminRole]);
+
+  // Safety fallback if active tab not allowed
+  useEffect(() => {
+    if (!allowedTabs.includes(activeTab)) {
+      setActiveTab(allowedTabs[0] || 'overview');
+    }
+  }, [allowedTabs, activeTab]);
 
   // Product modals state
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
@@ -78,12 +109,30 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [orderSearch, setOrderSearch] = useState('');
   const [orderStatusFilter, setOrderStatusFilter] = useState<string>('all');
 
-  // Settings form state
+  // Settings form state (Delivery Details & Support)
   const [whatsappNumber, setWhatsappNumber] = useState(settings.whatsappNumber);
   const [deliveryFee, setDeliveryFee] = useState<number>(settings.deliveryFee);
   const [freeDeliveryThreshold, setFreeDeliveryThreshold] = useState<number>(settings.freeDeliveryThreshold);
+  const [lagosDeliveryFee, setLagosDeliveryFee] = useState<number>(settings.lagosDeliveryFee ?? 2000);
+  const [nationwideDeliveryFee, setNationwideDeliveryFee] = useState<number>(settings.nationwideDeliveryFee ?? 3500);
+  const [deliveryEstimatedDays, setDeliveryEstimatedDays] = useState<string>(
+    settings.deliveryEstimatedDays || '1–2 Days Lagos, 2–4 Days Nationwide'
+  );
+  const [officeAddress, setOfficeAddress] = useState<string>(
+    settings.officeAddress || '14 Admiralty Way, Lekki Phase 1, Lagos, Nigeria'
+  );
   const [supportEmail, setSupportEmail] = useState(settings.supportEmail);
   const [supportPhone, setSupportPhone] = useState(settings.supportPhone);
+
+  // Announcement Bar Messages
+  const [announcements, setAnnouncements] = useState<string[]>(
+    settings.announcementMessages || [
+      'Everyday Solutions. Better Living.',
+      'Shop Smart. Save More.',
+      'Convenient Shopping Across Nigeria.',
+    ]
+  );
+  const [newAnnouncementInput, setNewAnnouncementInput] = useState('');
 
   // Hero Section Customizer state
   const [heroImage, setHeroImage] = useState<string>(
@@ -115,8 +164,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     setWhatsappNumber(settings.whatsappNumber);
     setDeliveryFee(settings.deliveryFee);
     setFreeDeliveryThreshold(settings.freeDeliveryThreshold);
+    setLagosDeliveryFee(settings.lagosDeliveryFee ?? 2000);
+    setNationwideDeliveryFee(settings.nationwideDeliveryFee ?? 3500);
+    setDeliveryEstimatedDays(settings.deliveryEstimatedDays || '1–2 Days Lagos, 2–4 Days Nationwide');
+    setOfficeAddress(settings.officeAddress || '14 Admiralty Way, Lekki Phase 1, Lagos, Nigeria');
     setSupportEmail(settings.supportEmail);
     setSupportPhone(settings.supportPhone);
+    if (settings.announcementMessages && settings.announcementMessages.length > 0) {
+      setAnnouncements(settings.announcementMessages);
+    }
     setHeroImage(settings.heroImage || '/assets/aistudio/image_11326346.png');
     setHeroTagline(settings.heroTagline || 'Welcome to Boricart');
     setHeroHeadline(settings.heroHeadline || 'Everyday Solutions.');
@@ -243,13 +299,30 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     }
   };
 
-  // Handle Settings Save
+  // Handle Add Announcement
+  const handleAddAnnouncement = () => {
+    if (!newAnnouncementInput.trim()) return;
+    setAnnouncements((prev) => [...prev, newAnnouncementInput.trim()]);
+    setNewAnnouncementInput('');
+  };
+
+  // Handle Remove Announcement
+  const handleRemoveAnnouncement = (index: number) => {
+    setAnnouncements((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  // Handle Settings Save (Delivery details, hero, support, announcements)
   const handleSaveSettings = async (e: React.FormEvent) => {
     e.preventDefault();
     await updateStoreSettings({
       whatsappNumber,
       deliveryFee: Number(deliveryFee),
       freeDeliveryThreshold: Number(freeDeliveryThreshold),
+      lagosDeliveryFee: Number(lagosDeliveryFee),
+      nationwideDeliveryFee: Number(nationwideDeliveryFee),
+      deliveryEstimatedDays,
+      officeAddress,
+      announcementMessages: announcements,
       supportEmail,
       supportPhone,
       heroImage,
@@ -278,6 +351,32 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     }
   };
 
+  const getRoleBadge = (role: AdminRole) => {
+    switch (role) {
+      case 'overall_admin':
+        return (
+          <span className="bg-[#F5A623]/20 border border-[#F5A623] text-[#F5A623] text-[10px] font-black px-2 py-0.5 rounded-full uppercase flex items-center gap-1">
+            <ShieldCheck className="w-3 h-3" />
+            <span>Overall Super Admin</span>
+          </span>
+        );
+      case 'store_keeper':
+        return (
+          <span className="bg-blue-900/60 border border-blue-500 text-blue-300 text-[10px] font-black px-2 py-0.5 rounded-full uppercase flex items-center gap-1">
+            <Package className="w-3 h-3" />
+            <span>Store Keeper</span>
+          </span>
+        );
+      case 'order_dispatcher':
+        return (
+          <span className="bg-purple-900/60 border border-purple-500 text-purple-300 text-[10px] font-black px-2 py-0.5 rounded-full uppercase flex items-center gap-1">
+            <Truck className="w-3 h-3" />
+            <span>Order Dispatcher</span>
+          </span>
+        );
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-50/60 pb-16">
       {/* Admin Top Navigation */}
@@ -296,21 +395,39 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 />
               </div>
               <div className="hidden sm:block">
-                <span className="font-black text-xs tracking-tight text-white uppercase block">
-                  Admin Portal
-                </span>
+                <div className="flex items-center gap-2">
+                  <span className="font-black text-xs tracking-tight text-white uppercase block">
+                    Admin Portal
+                  </span>
+                  {getRoleBadge(adminRole)}
+                </div>
                 <span className="text-[10px] text-gray-400 block -mt-0.5">
-                  Cloud Management
+                  {staffUser?.name || user?.displayName || user?.email || 'Authenticated Admin'}
                 </span>
               </div>
             </div>
 
             <div className="flex items-center gap-3">
+              {/* Role Switcher for Admin previewing */}
+              <div className="hidden md:flex items-center gap-1.5 bg-gray-800/80 px-2 py-1 rounded-xl border border-gray-700">
+                <span className="text-[10px] text-gray-400 font-bold uppercase">Role:</span>
+                <select
+                  value={adminRole}
+                  onChange={(e) => switchRole(e.target.value as AdminRole)}
+                  className="bg-transparent text-white text-xs font-bold focus:outline-none cursor-pointer"
+                  title="Switch current view role to test access privileges"
+                >
+                  <option value="overall_admin" className="bg-gray-900 text-white">Overall Admin (All)</option>
+                  <option value="store_keeper" className="bg-gray-900 text-white">Store Keeper (Products)</option>
+                  <option value="order_dispatcher" className="bg-gray-900 text-white">Order Dispatcher (Orders)</option>
+                </select>
+              </div>
+
               <button
                 onClick={() => onNavigate('home')}
                 className="hidden sm:flex items-center gap-1.5 text-xs text-gray-300 hover:text-white px-3 py-1.5 rounded-lg hover:bg-gray-800 transition-colors"
               >
-                <span>View Storefront</span>
+                <span>Storefront</span>
                 <ExternalLink className="w-3.5 h-3.5" />
               </button>
 
@@ -331,63 +448,103 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
         {/* Admin Tabs */}
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex space-x-1 sm:space-x-4 border-t border-gray-800/80 overflow-x-auto">
-          <button
-            onClick={() => setActiveTab('overview')}
-            className={`py-3 px-3 text-xs sm:text-sm font-bold border-b-2 whitespace-nowrap transition-all ${
-              activeTab === 'overview'
-                ? 'border-[#F5A623] text-[#F5A623]'
-                : 'border-transparent text-gray-400 hover:text-gray-200'
-            }`}
-          >
-            Overview
-          </button>
-          <button
-            onClick={() => setActiveTab('products')}
-            className={`py-3 px-3 text-xs sm:text-sm font-bold border-b-2 whitespace-nowrap transition-all flex items-center gap-1.5 ${
-              activeTab === 'products'
-                ? 'border-[#F5A623] text-[#F5A623]'
-                : 'border-transparent text-gray-400 hover:text-gray-200'
-            }`}
-          >
-            <span>Products</span>
-            <span className="text-[10px] bg-gray-800 px-1.5 py-0.5 rounded-full">{totalProducts}</span>
-          </button>
-          <button
-            onClick={() => setActiveTab('categories')}
-            className={`py-3 px-3 text-xs sm:text-sm font-bold border-b-2 whitespace-nowrap transition-all flex items-center gap-1.5 ${
-              activeTab === 'categories'
-                ? 'border-[#F5A623] text-[#F5A623]'
-                : 'border-transparent text-gray-400 hover:text-gray-200'
-            }`}
-          >
-            <span>Categories</span>
-            <span className="text-[10px] bg-gray-800 px-1.5 py-0.5 rounded-full">{categories.length}</span>
-          </button>
-          <button
-            onClick={() => setActiveTab('orders')}
-            className={`py-3 px-3 text-xs sm:text-sm font-bold border-b-2 whitespace-nowrap transition-all flex items-center gap-1.5 ${
-              activeTab === 'orders'
-                ? 'border-[#F5A623] text-[#F5A623]'
-                : 'border-transparent text-gray-400 hover:text-gray-200'
-            }`}
-          >
-            <span>Orders</span>
-            {pendingOrders > 0 && (
-              <span className="text-[10px] bg-[#F5A623] text-black font-extrabold px-1.5 py-0.5 rounded-full">
-                {pendingOrders}
-              </span>
-            )}
-          </button>
-          <button
-            onClick={() => setActiveTab('settings')}
-            className={`py-3 px-3 text-xs sm:text-sm font-bold border-b-2 whitespace-nowrap transition-all ${
-              activeTab === 'settings'
-                ? 'border-[#F5A623] text-[#F5A623]'
-                : 'border-transparent text-gray-400 hover:text-gray-200'
-            }`}
-          >
-            Store Settings
-          </button>
+          {allowedTabs.includes('overview') && (
+            <button
+              onClick={() => setActiveTab('overview')}
+              className={`py-3 px-3 text-xs sm:text-sm font-bold border-b-2 whitespace-nowrap transition-all ${
+                activeTab === 'overview'
+                  ? 'border-[#F5A623] text-[#F5A623]'
+                  : 'border-transparent text-gray-400 hover:text-gray-200'
+              }`}
+            >
+              Overview
+            </button>
+          )}
+
+          {allowedTabs.includes('products') && (
+            <button
+              onClick={() => setActiveTab('products')}
+              className={`py-3 px-3 text-xs sm:text-sm font-bold border-b-2 whitespace-nowrap transition-all flex items-center gap-1.5 ${
+                activeTab === 'products'
+                  ? 'border-[#F5A623] text-[#F5A623]'
+                  : 'border-transparent text-gray-400 hover:text-gray-200'
+              }`}
+            >
+              <span>Products</span>
+              <span className="text-[10px] bg-gray-800 px-1.5 py-0.5 rounded-full">{totalProducts}</span>
+            </button>
+          )}
+
+          {allowedTabs.includes('categories') && (
+            <button
+              onClick={() => setActiveTab('categories')}
+              className={`py-3 px-3 text-xs sm:text-sm font-bold border-b-2 whitespace-nowrap transition-all flex items-center gap-1.5 ${
+                activeTab === 'categories'
+                  ? 'border-[#F5A623] text-[#F5A623]'
+                  : 'border-transparent text-gray-400 hover:text-gray-200'
+              }`}
+            >
+              <span>Categories</span>
+              <span className="text-[10px] bg-gray-800 px-1.5 py-0.5 rounded-full">{categories.length}</span>
+            </button>
+          )}
+
+          {allowedTabs.includes('orders') && (
+            <button
+              onClick={() => setActiveTab('orders')}
+              className={`py-3 px-3 text-xs sm:text-sm font-bold border-b-2 whitespace-nowrap transition-all flex items-center gap-1.5 ${
+                activeTab === 'orders'
+                  ? 'border-[#F5A623] text-[#F5A623]'
+                  : 'border-transparent text-gray-400 hover:text-gray-200'
+              }`}
+            >
+              <span>Orders</span>
+              {pendingOrders > 0 && (
+                <span className="text-[10px] bg-[#F5A623] text-black font-extrabold px-1.5 py-0.5 rounded-full">
+                  {pendingOrders}
+                </span>
+              )}
+            </button>
+          )}
+
+          {allowedTabs.includes('pages-cms') && (
+            <button
+              onClick={() => setActiveTab('pages-cms')}
+              className={`py-3 px-3 text-xs sm:text-sm font-bold border-b-2 whitespace-nowrap transition-all flex items-center gap-1.5 ${
+                activeTab === 'pages-cms'
+                  ? 'border-[#F5A623] text-[#F5A623]'
+                  : 'border-transparent text-gray-400 hover:text-gray-200'
+              }`}
+            >
+              <span>Pages CMS</span>
+            </button>
+          )}
+
+          {allowedTabs.includes('staff') && (
+            <button
+              onClick={() => setActiveTab('staff')}
+              className={`py-3 px-3 text-xs sm:text-sm font-bold border-b-2 whitespace-nowrap transition-all flex items-center gap-1.5 ${
+                activeTab === 'staff'
+                  ? 'border-[#F5A623] text-[#F5A623]'
+                  : 'border-transparent text-gray-400 hover:text-gray-200'
+              }`}
+            >
+              <span>Staff & Privileges</span>
+            </button>
+          )}
+
+          {allowedTabs.includes('settings') && (
+            <button
+              onClick={() => setActiveTab('settings')}
+              className={`py-3 px-3 text-xs sm:text-sm font-bold border-b-2 whitespace-nowrap transition-all ${
+                activeTab === 'settings'
+                  ? 'border-[#F5A623] text-[#F5A623]'
+                  : 'border-transparent text-gray-400 hover:text-gray-200'
+              }`}
+            >
+              Store & Delivery Settings
+            </button>
+          )}
         </div>
       </div>
 
@@ -466,13 +623,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               {/* Recent Orders List */}
               <div className="lg:col-span-8 bg-white rounded-3xl border border-gray-100 p-6 shadow-xs space-y-4">
                 <div className="flex items-center justify-between pb-3 border-b border-gray-100">
-                  <h3 className="font-extrabold text-base text-[#333333]">Recent Orders</h3>
-                  <button
-                    onClick={() => setActiveTab('orders')}
-                    className="text-xs font-bold text-[#F5A623] hover:underline"
-                  >
-                    View All Orders →
-                  </button>
+                  <h3 className="font-extrabold text-base text-[#333333]">Recent Customer Orders</h3>
+                  {allowedTabs.includes('orders') && (
+                    <button
+                      onClick={() => setActiveTab('orders')}
+                      className="text-xs font-bold text-[#F5A623] hover:underline"
+                    >
+                      View All Orders →
+                    </button>
+                  )}
                 </div>
 
                 {orders.length === 0 ? (
@@ -518,58 +677,78 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               {/* Quick Actions Panel */}
               <div className="lg:col-span-4 bg-white rounded-3xl border border-gray-100 p-6 shadow-xs space-y-4">
                 <h3 className="font-extrabold text-base text-[#333333] pb-3 border-b border-gray-100">
-                  Store Administration
+                  Operational Actions
                 </h3>
 
                 <div className="space-y-2.5">
-                  <button
-                    onClick={() => {
-                      setEditingProduct(null);
-                      setIsProductModalOpen(true);
-                    }}
-                    className="w-full bg-[#F5A623] hover:bg-[#D98200] text-white font-bold p-3 rounded-2xl flex items-center justify-center gap-2 text-xs shadow-xs transition-all"
-                  >
-                    <Plus className="w-4 h-4" />
-                    <span>Add New Product</span>
-                  </button>
-
-                  <button
-                    onClick={() => {
-                      setEditingCategory(null);
-                      setIsCategoryModalOpen(true);
-                    }}
-                    className="w-full bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold p-3 rounded-2xl flex items-center justify-center gap-2 text-xs transition-colors"
-                  >
-                    <Plus className="w-4 h-4" />
-                    <span>Create Category</span>
-                  </button>
-
-                  <button
-                    onClick={() => setActiveTab('settings')}
-                    className="w-full bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 font-bold p-3 rounded-2xl flex items-center justify-center gap-2 text-xs transition-colors"
-                  >
-                    <Layout className="w-4 h-4 text-[#F5A623]" />
-                    <span>Customize Hero Section</span>
-                  </button>
-
-                  <button
-                    onClick={() => setActiveTab('settings')}
-                    className="w-full bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold p-3 rounded-2xl flex items-center justify-center gap-2 text-xs transition-colors"
-                  >
-                    <Settings className="w-4 h-4 text-gray-600" />
-                    <span>Configure WhatsApp & Delivery Fees</span>
-                  </button>
-
-                  <div className="pt-4 border-t border-gray-100">
+                  {allowedTabs.includes('products') && (
                     <button
-                      onClick={handleReseed}
-                      disabled={isSeeding}
-                      className="w-full text-xs font-semibold text-gray-500 hover:text-[#F5A623] flex items-center justify-center gap-1.5 py-1"
+                      onClick={() => {
+                        setEditingProduct(null);
+                        setIsProductModalOpen(true);
+                      }}
+                      className="w-full bg-[#F5A623] hover:bg-[#D98200] text-white font-bold p-3 rounded-2xl flex items-center justify-center gap-2 text-xs shadow-xs transition-all"
                     >
-                      <RotateCcw className={`w-3.5 h-3.5 ${isSeeding ? 'animate-spin' : ''}`} />
-                      <span>{isSeeding ? 'Seeding Catalog...' : 'Sync Standard Catalog'}</span>
+                      <Plus className="w-4 h-4" />
+                      <span>Add New Product</span>
                     </button>
-                  </div>
+                  )}
+
+                  {allowedTabs.includes('categories') && (
+                    <button
+                      onClick={() => {
+                        setEditingCategory(null);
+                        setIsCategoryModalOpen(true);
+                      }}
+                      className="w-full bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold p-3 rounded-2xl flex items-center justify-center gap-2 text-xs transition-colors"
+                    >
+                      <Plus className="w-4 h-4" />
+                      <span>Create Category</span>
+                    </button>
+                  )}
+
+                  {allowedTabs.includes('pages-cms') && (
+                    <button
+                      onClick={() => setActiveTab('pages-cms')}
+                      className="w-full bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold p-3 rounded-2xl flex items-center justify-center gap-2 text-xs transition-colors"
+                    >
+                      <FileText className="w-4 h-4 text-gray-600" />
+                      <span>Edit Website Pages & FAQs</span>
+                    </button>
+                  )}
+
+                  {allowedTabs.includes('staff') && (
+                    <button
+                      onClick={() => setActiveTab('staff')}
+                      className="w-full bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 font-bold p-3 rounded-2xl flex items-center justify-center gap-2 text-xs transition-colors"
+                    >
+                      <Users className="w-4 h-4 text-[#F5A623]" />
+                      <span>Manage Staff & Access Privileges</span>
+                    </button>
+                  )}
+
+                  {allowedTabs.includes('settings') && (
+                    <button
+                      onClick={() => setActiveTab('settings')}
+                      className="w-full bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold p-3 rounded-2xl flex items-center justify-center gap-2 text-xs transition-colors"
+                    >
+                      <Settings className="w-4 h-4 text-gray-600" />
+                      <span>Delivery Fees & WhatsApp Config</span>
+                    </button>
+                  )}
+
+                  {adminRole === 'overall_admin' && (
+                    <div className="pt-4 border-t border-gray-100">
+                      <button
+                        onClick={handleReseed}
+                        disabled={isSeeding}
+                        className="w-full text-xs font-semibold text-gray-500 hover:text-[#F5A623] flex items-center justify-center gap-1.5 py-1"
+                      >
+                        <RotateCcw className={`w-3.5 h-3.5 ${isSeeding ? 'animate-spin' : ''}`} />
+                        <span>{isSeeding ? 'Seeding Catalog...' : 'Sync Standard Catalog'}</span>
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -579,7 +758,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         {/* TAB 2: PRODUCTS MANAGEMENT */}
         {activeTab === 'products' && (
           <div className="space-y-6">
-            {/* Action Bar */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-4 rounded-3xl border border-gray-100 shadow-xs">
               <div className="flex flex-1 items-center gap-3">
                 <div className="relative flex-1 max-w-md">
@@ -836,7 +1014,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         {/* TAB 4: ORDERS MANAGEMENT */}
         {activeTab === 'orders' && (
           <div className="space-y-6">
-            {/* Filter Bar */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-4 rounded-3xl border border-gray-100 shadow-xs">
               <div className="relative flex-1 max-w-md">
                 <input
@@ -970,12 +1147,21 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           </div>
         )}
 
-        {/* TAB 5: STORE SETTINGS & HERO CUSTOMIZATION */}
+        {/* TAB 5: PAGES CMS (EDIT ALL PAGES FROM BACKEND) */}
+        {activeTab === 'pages-cms' && (
+          <PagesCmsTab settings={settings} onRefreshData={onRefreshData} />
+        )}
+
+        {/* TAB 6: STAFF MEMBERS & ACCESS PRIVILEGES */}
+        {activeTab === 'staff' && (
+          <StaffManagementTab currentAdminEmail={user?.email || undefined} />
+        )}
+
+        {/* TAB 7: STORE SETTINGS, DELIVERY FEES & HERO CUSTOMIZATION */}
         {activeTab === 'settings' && (
           <div className="space-y-8 max-w-4xl">
-            {/* Header */}
             <div>
-              <h3 className="font-black text-2xl text-[#333333]">Store & Website Configuration</h3>
+              <h3 className="font-black text-2xl text-[#333333]">Store, Delivery & Hero Configuration</h3>
               <p className="text-xs text-gray-500 mt-1">
                 Customize your homepage hero banner image and messaging, WhatsApp click-to-chat, delivery fees, and contact info.
               </p>
@@ -1179,16 +1365,158 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 </div>
               </div>
 
-              {/* CARD 2: WHATSAPP & DELIVERY CONFIGURATION */}
+              {/* CARD 2: DELIVERY DETAILS & PRICING */}
+              <div className="bg-white rounded-3xl border border-gray-100 p-6 sm:p-8 shadow-xs space-y-6">
+                <div className="flex items-center gap-3 pb-4 border-b border-gray-100">
+                  <div className="w-10 h-10 rounded-2xl bg-amber-50 text-[#F5A623] flex items-center justify-center font-bold">
+                    <Truck className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h4 className="font-extrabold text-base text-[#333333]">Delivery Details & Shipping Pricing</h4>
+                    <p className="text-xs text-gray-500">
+                      Configure standard, Lagos, and Nationwide delivery pricing, timelines, and free shipping threshold.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 mb-1">
+                      Standard Delivery Fee (NGN)
+                    </label>
+                    <input
+                      type="number"
+                      required
+                      min="0"
+                      value={deliveryFee}
+                      onChange={(e) => setDeliveryFee(Number(e.target.value))}
+                      className="w-full text-sm bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 focus:bg-white focus:outline-none focus:border-[#F5A623]"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 mb-1">
+                      Free Delivery Threshold (NGN)
+                    </label>
+                    <input
+                      type="number"
+                      required
+                      min="0"
+                      value={freeDeliveryThreshold}
+                      onChange={(e) => setFreeDeliveryThreshold(Number(e.target.value))}
+                      className="w-full text-sm bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 focus:bg-white focus:outline-none focus:border-[#F5A623]"
+                    />
+                    <span className="text-[11px] text-gray-400 mt-1 block">
+                      Orders equal to or above this amount receive 100% Free Shipping.
+                    </span>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 mb-1">
+                      Lagos State Express Delivery Fee (NGN)
+                    </label>
+                    <input
+                      type="number"
+                      required
+                      min="0"
+                      value={lagosDeliveryFee}
+                      onChange={(e) => setLagosDeliveryFee(Number(e.target.value))}
+                      className="w-full text-sm bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 focus:bg-white focus:outline-none focus:border-[#F5A623]"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 mb-1">
+                      Nationwide Interstate Shipping Fee (NGN)
+                    </label>
+                    <input
+                      type="number"
+                      required
+                      min="0"
+                      value={nationwideDeliveryFee}
+                      onChange={(e) => setNationwideDeliveryFee(Number(e.target.value))}
+                      className="w-full text-sm bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 focus:bg-white focus:outline-none focus:border-[#F5A623]"
+                    />
+                  </div>
+
+                  <div className="sm:col-span-2">
+                    <label className="block text-xs font-bold text-gray-700 mb-1">
+                      Estimated Delivery Timeline
+                    </label>
+                    <input
+                      type="text"
+                      value={deliveryEstimatedDays}
+                      onChange={(e) => setDeliveryEstimatedDays(e.target.value)}
+                      placeholder="1–2 Days Lagos, 2–4 Days Nationwide"
+                      className="w-full text-sm bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 focus:bg-white focus:outline-none focus:border-[#F5A623]"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* CARD 3: ANNOUNCEMENT BAR MESSAGES */}
+              <div className="bg-white rounded-3xl border border-gray-100 p-6 sm:p-8 shadow-xs space-y-6">
+                <div className="flex items-center gap-3 pb-4 border-b border-gray-100">
+                  <div className="w-10 h-10 rounded-2xl bg-amber-50 text-[#F5A623] flex items-center justify-center font-bold">
+                    <MessageSquare className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h4 className="font-extrabold text-base text-[#333333]">Announcement Bar Messages</h4>
+                    <p className="text-xs text-gray-500">
+                      Manage the rotating banner alerts at the very top of the customer storefront.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      placeholder="New announcement (e.g. Free Delivery on orders above ₦15,000)"
+                      value={newAnnouncementInput}
+                      onChange={(e) => setNewAnnouncementInput(e.target.value)}
+                      className="flex-1 text-xs bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2.5 focus:bg-white focus:outline-none focus:border-[#F5A623]"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleAddAnnouncement}
+                      disabled={!newAnnouncementInput.trim()}
+                      className="bg-[#333333] hover:bg-black text-white text-xs font-bold px-4 py-2.5 rounded-xl transition-colors disabled:opacity-40"
+                    >
+                      Add Message
+                    </button>
+                  </div>
+
+                  <div className="space-y-2 pt-2">
+                    {announcements.map((msg, idx) => (
+                      <div
+                        key={idx}
+                        className="p-3 bg-amber-50/50 border border-amber-100 rounded-xl flex items-center justify-between text-xs text-gray-800"
+                      >
+                        <span className="font-medium">{msg}</span>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveAnnouncement(idx)}
+                          className="text-gray-400 hover:text-red-600 p-1 rounded-lg transition-colors"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* CARD 4: WHATSAPP & SUPPORT CHANNELS */}
               <div className="bg-white rounded-3xl border border-gray-100 p-6 sm:p-8 shadow-xs space-y-6">
                 <div className="flex items-center gap-3 pb-4 border-b border-gray-100">
                   <div className="w-10 h-10 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
                     <Phone className="w-5 h-5" />
                   </div>
                   <div>
-                    <h4 className="font-extrabold text-base text-[#333333]">WhatsApp, Delivery & Support</h4>
+                    <h4 className="font-extrabold text-base text-[#333333]">WhatsApp & Customer Support</h4>
                     <p className="text-xs text-gray-500">
-                      Configure customer order routing, delivery fees across Nigeria, and support channels.
+                      Configure customer order routing and support channels.
                     </p>
                   </div>
                 </div>
@@ -1213,36 +1541,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-xs font-bold text-gray-700 mb-1">
-                        Standard Delivery Fee (NGN)
-                      </label>
-                      <input
-                        type="number"
-                        required
-                        min="0"
-                        value={deliveryFee}
-                        onChange={(e) => setDeliveryFee(Number(e.target.value))}
-                        className="w-full text-sm bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 focus:bg-white focus:outline-none focus:border-[#F5A623]"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-bold text-gray-700 mb-1">
-                        Free Delivery Threshold (NGN)
-                      </label>
-                      <input
-                        type="number"
-                        required
-                        min="0"
-                        value={freeDeliveryThreshold}
-                        onChange={(e) => setFreeDeliveryThreshold(Number(e.target.value))}
-                        className="w-full text-sm bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 focus:bg-white focus:outline-none focus:border-[#F5A623]"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
                       <label className="block text-xs font-bold text-gray-700 mb-1">Support Email</label>
                       <input
                         type="email"
@@ -1262,6 +1560,18 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       />
                     </div>
                   </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 mb-1">
+                      Physical Office / Central Fulfillment Address
+                    </label>
+                    <input
+                      type="text"
+                      value={officeAddress}
+                      onChange={(e) => setOfficeAddress(e.target.value)}
+                      className="w-full text-sm bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 focus:bg-white focus:outline-none focus:border-[#F5A623]"
+                    />
+                  </div>
                 </div>
               </div>
 
@@ -1272,7 +1582,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   className="bg-[#F5A623] hover:bg-[#D98200] text-white font-black py-3.5 px-8 rounded-2xl text-xs sm:text-sm shadow-md hover:shadow-lg transition-all flex items-center gap-2"
                 >
                   <CheckCircle2 className="w-4 h-4" />
-                  <span>Save All Store & Hero Settings</span>
+                  <span>Save All Store & Delivery Settings</span>
                 </button>
               </div>
             </form>

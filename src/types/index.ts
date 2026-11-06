@@ -115,8 +115,12 @@ export interface AdminUser {
 }
 
 export interface SiteFaq {
-  q: string;
-  a: string;
+  id?: string;
+  question?: string;
+  answer?: string;
+  category?: 'orders' | 'delivery' | 'payments' | 'products' | string;
+  q?: string;
+  a?: string;
 }
 
 export interface SitePagesContent {
@@ -134,19 +138,24 @@ export interface SitePagesContent {
   contactSubheading: string;
   officeAddress: string;
   businessHours: string;
-  contactFaqs: SiteFaq[];
+  contactFaqs?: SiteFaq[];
+  faqs?: SiteFaq[];
 
   // Delivery & Returns
-  deliveryHeadline: string;
+  deliveryHeadline?: string;
   deliveryLagosInfo: string;
   deliveryNationwideInfo: string;
+  deliveryCodGuarantee?: string;
   returnsPolicyText: string;
-  warrantyPeriodDays: number;
-  warrantyText: string;
+  warrantyPeriodDays?: number;
+  warrantyText?: string;
+  warrantyPolicyText?: string;
 
   // Legal Policies
-  termsConditionsText: string;
-  privacyPolicyText: string;
+  termsConditionsText?: string;
+  termsContent?: string;
+  privacyPolicyText?: string;
+  privacyContent?: string;
 }
 
 export interface StoreSettings {

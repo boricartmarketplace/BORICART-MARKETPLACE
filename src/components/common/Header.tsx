@@ -18,7 +18,7 @@ import {
 import { useCart } from '../../context/CartContext';
 import { useAuth } from '../../context/AuthContext';
 import { useWishlist } from '../../context/WishlistContext';
-import { Category, Product } from '../../types';
+import { Category, Product, StoreSettings } from '../../types';
 import { formatNaira } from '../../firebase/services';
 
 interface HeaderProps {

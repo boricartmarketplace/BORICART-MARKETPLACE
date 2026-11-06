@@ -18,6 +18,8 @@ interface AuthContextType {
   staffUser: AdminUser | null;
   isLoading: boolean;
   loginWithGoogle: () => Promise<void>;
+  registerWithEmailPassword: (name: string, email: string, password: string, role?: AdminRole) => Promise<void>;
+  loginWithEmailPassword: (email: string, password: string) => Promise<void>;
   loginDemoAdmin: (role?: AdminRole) => void;
   switchRole: (role: AdminRole) => void;
   logout: () => Promise<void>;
@@ -51,7 +53,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (!snap.empty) {
         const data = snap.docs[0].data() as AdminUser;
         if (data.status !== 'suspended') {
-          setStaffUser({ id: snap.docs[0].id, ...data });
+          setStaffUser({ ...data, id: snap.docs[0].id });
           setAdminRole(data.role || 'overall_admin');
           localStorage.setItem('boricart_admin_role', data.role || 'overall_admin');
           return true;
@@ -107,6 +109,55 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const registerWithEmailPassword = async (name: string, email: string, password: string, role: AdminRole = 'overall_admin') => {
+    setIsLoading(true);
+    try {
+      const { createUserWithEmailAndPassword, updateProfile } = await import('firebase/auth');
+      const cred = await createUserWithEmailAndPassword(auth, email.trim(), password);
+      if (cred.user) {
+        await updateProfile(cred.user, { displayName: name });
+        // Register staff in Firestore admins collection
+        const { saveStaffMember } = await import('../firebase/services');
+        const staffDoc = await saveStaffMember({
+          id: `admin-${cred.user.uid}`,
+          name: name.trim(),
+          email: email.trim().toLowerCase(),
+          role: role,
+          status: 'active',
+          createdAt: new Date().toISOString(),
+        });
+        setStaffUser(staffDoc);
+        setAdminRole(role);
+        localStorage.setItem('boricart_admin_role', role);
+      }
+      localStorage.setItem('boricart_admin_session', 'true');
+      setIsAdmin(true);
+    } catch (error) {
+      console.error('Email registration error:', error);
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const loginWithEmailPassword = async (email: string, password: string) => {
+    setIsLoading(true);
+    try {
+      const { signInWithEmailAndPassword } = await import('firebase/auth');
+      const cred = await signInWithEmailAndPassword(auth, email.trim(), password);
+      if (cred.user?.email) {
+        await checkStaffRole(cred.user.email);
+      }
+      localStorage.setItem('boricart_admin_session', 'true');
+      setIsAdmin(true);
+    } catch (error) {
+      console.error('Email sign-in error:', error);
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const loginDemoAdmin = (role: AdminRole = 'overall_admin') => {
     localStorage.setItem('boricart_admin_session', 'true');
     localStorage.setItem('boricart_admin_role', role);
@@ -144,6 +195,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         staffUser,
         isLoading,
         loginWithGoogle,
+        registerWithEmailPassword,
+        loginWithEmailPassword,
         loginDemoAdmin,
         switchRole,
         logout,
