@@ -489,8 +489,12 @@ export const DEFAULT_SETTINGS: StoreSettings = {
   supportPhone: '+234 814 000 8921',
   deliveryFee: 2500,
   freeDeliveryThreshold: 15000, // Matches top bar in reference screenshot: "Free Delivery on Orders Above ₦15,000"
+  heroImage: '/assets/aistudio/image_11326346.png',
+  heroTagline: 'Welcome to Boricart',
   heroHeadline: 'Everyday Solutions.',
   heroSubhead: 'Better Living.',
+  heroDescription: 'Discover practical products designed to make everyday life easier, smarter and more convenient.',
+  heroButtonText: 'Shop Now',
   updatedAt: new Date().toISOString(),
 };
 

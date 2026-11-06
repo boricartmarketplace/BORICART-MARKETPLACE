@@ -109,8 +109,11 @@ export interface StoreSettings {
   deliveryFee: number;
   freeDeliveryThreshold: number;
   heroImage?: string;
+  heroTagline?: string;
   heroHeadline?: string;
   heroSubhead?: string;
+  heroDescription?: string;
+  heroButtonText?: string;
   updatedAt: string;
 }
 

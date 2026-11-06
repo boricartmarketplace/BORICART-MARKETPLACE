@@ -34,11 +34,17 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({ onNavigate }) => {
     <div className="min-h-[70vh] flex items-center justify-center px-4 py-12">
       <div className="max-w-md w-full bg-white rounded-3xl border border-gray-100 shadow-xl p-8 sm:p-10 space-y-6">
         {/* Brand Header */}
-        <div className="text-center space-y-2">
-          <div className="w-14 h-14 rounded-2xl bg-[#333333] text-[#F5A623] flex items-center justify-center mx-auto shadow-md">
-            <Lock className="w-7 h-7" />
+        <div className="text-center space-y-3">
+          <div className="flex justify-center">
+            <div className="p-3 bg-white border border-gray-100 rounded-2xl shadow-xs inline-flex items-center">
+              <img
+                src="/assets/aistudio/image_af74bfee.png"
+                alt="BORICART"
+                className="h-10 sm:h-12 w-auto object-contain"
+              />
+            </div>
           </div>
-          <h1 className="text-2xl font-black text-[#333333]">BORICART Admin Portal</h1>
+          <h1 className="text-xl font-black text-[#333333]">Administrator Portal</h1>
           <p className="text-xs text-gray-500">
             Authorized management backend for products, categories, orders, and store settings.
           </p>

@@ -72,14 +72,21 @@ export const OrderConfirmationPage: React.FC<OrderConfirmationPageProps> = ({
       <div className="bg-white rounded-3xl border border-gray-100 p-6 sm:p-8 shadow-sm space-y-6">
         {/* Header with Order ID & Status */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-6 border-b border-gray-100 gap-4">
-          <div>
-            <span className="text-xs text-gray-400 uppercase font-semibold">Order Number</span>
-            <div className="text-2xl font-black text-[#333333] tracking-tight">
-              {order.orderNumber}
+          <div className="flex items-center gap-3">
+            <img
+              src="/assets/aistudio/image_af74bfee.png"
+              alt="BORICART"
+              className="h-10 w-auto object-contain"
+            />
+            <div>
+              <span className="text-xs text-gray-400 uppercase font-semibold">Order Number</span>
+              <div className="text-2xl font-black text-[#333333] tracking-tight">
+                {order.orderNumber}
+              </div>
+              <span className="text-xs text-gray-500">
+                Placed on {new Date(order.createdAt).toLocaleDateString('en-GB', { dateStyle: 'long' })}
+              </span>
             </div>
-            <span className="text-xs text-gray-500">
-              Placed on {new Date(order.createdAt).toLocaleDateString('en-GB', { dateStyle: 'long' })}
-            </span>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">

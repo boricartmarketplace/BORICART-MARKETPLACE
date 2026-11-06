@@ -182,30 +182,16 @@ export const Header: React.FC<HeaderProps> = ({
             </button>
           </div>
 
-          {/* Logo (Exact match with reference screenshot) */}
+          {/* Official BORICART Logo */}
           <div
             onClick={() => onNavigate('home')}
-            className="flex items-center gap-2.5 cursor-pointer select-none shrink-0"
+            className="flex items-center gap-2 cursor-pointer select-none shrink-0"
           >
-            {/* Shopping bag mark */}
-            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-[#F5A623] to-[#D98200] flex items-center justify-center text-white shadow-xs relative">
-              <ShoppingBag className="w-5 h-5 sm:w-6 sm:h-6 text-white stroke-[2.5]" />
-              <div className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-black border-2 border-white" />
-            </div>
-
-            <div className="flex flex-col">
-              <div className="flex items-baseline">
-                <span className="text-xl sm:text-2xl font-black tracking-tight text-[#111111]">
-                  Bori
-                </span>
-                <span className="text-xl sm:text-2xl font-black tracking-tight text-[#F5A623]">
-                  cart
-                </span>
-              </div>
-              <span className="text-[9px] sm:text-[10px] font-semibold text-gray-500 tracking-tight -mt-1 hidden xs:block">
-                Everyday Solutions. Better Living.
-              </span>
-            </div>
+            <img
+              src="/assets/aistudio/image_af74bfee.png"
+              alt="BORICART — Everyday Solutions. Better Living."
+              className="h-10 sm:h-12 w-auto object-contain hover:opacity-95 transition-opacity"
+            />
           </div>
 
           {/* Center Search Field (Exact wide pill with orange search button) */}
@@ -491,13 +477,18 @@ export const Header: React.FC<HeaderProps> = ({
           <div className="fixed inset-y-0 left-0 max-w-xs w-full bg-white shadow-2xl p-6 overflow-y-auto flex flex-col justify-between">
             <div className="space-y-6">
               <div className="flex items-center justify-between pb-4 border-b border-gray-100">
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-xl bg-[#F5A623] flex items-center justify-center text-white font-black text-sm">
-                    B
-                  </div>
-                  <span className="text-lg font-black text-[#111111]">
-                    Bori<span className="text-[#F5A623]">cart</span>
-                  </span>
+                <div
+                  className="flex items-center cursor-pointer"
+                  onClick={() => {
+                    setMobileMenuOpen(false);
+                    onNavigate('home');
+                  }}
+                >
+                  <img
+                    src="/assets/aistudio/image_af74bfee.png"
+                    alt="BORICART"
+                    className="h-9 w-auto object-contain"
+                  />
                 </div>
                 <button
                   onClick={() => setMobileMenuOpen(false)}

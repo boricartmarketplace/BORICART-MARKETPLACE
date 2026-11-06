@@ -21,7 +21,7 @@ import {
   Flame,
   Crown,
 } from 'lucide-react';
-import { Product, Category, CollectionItem } from '../types';
+import { Product, Category, CollectionItem, StoreSettings } from '../types';
 import { ProductCard } from '../components/common/ProductCard';
 import { WhatsAppButton } from '../components/common/WhatsAppButton';
 import { BORICART_COLLECTIONS } from '../data/initialCatalog';
@@ -30,6 +30,7 @@ import { formatNaira } from '../firebase/services';
 interface HomePageProps {
   products: Product[];
   categories: Category[];
+  settings?: StoreSettings;
   onNavigate: (page: string, params?: Record<string, any>) => void;
   whatsappNumber?: string;
 }
@@ -37,10 +38,21 @@ interface HomePageProps {
 export const HomePage: React.FC<HomePageProps> = ({
   products,
   categories,
+  settings,
   onNavigate,
   whatsappNumber = '+2348140008921',
 }) => {
   const publishedProducts = products.filter((p) => p.status === 'published');
+
+  // Dynamic Hero Section fields from store settings
+  const heroImage = settings?.heroImage || '/assets/aistudio/image_11326346.png';
+  const heroTagline = settings?.heroTagline || 'Welcome to Boricart';
+  const heroHeadline = settings?.heroHeadline || 'Everyday Solutions.';
+  const heroSubhead = settings?.heroSubhead || 'Better Living.';
+  const heroDescription =
+    settings?.heroDescription ||
+    'Discover practical products designed to make everyday life easier, smarter and more convenient.';
+  const heroButtonText = settings?.heroButtonText || 'Shop Now';
 
   // Filter top sellers and featured
   const bestSellers = publishedProducts.filter((p) => p.isBestSeller);
@@ -62,7 +74,7 @@ export const HomePage: React.FC<HomePageProps> = ({
   return (
     <div className="space-y-10 sm:space-y-14 pb-20 sm:pb-24">
       {/* =========================================================================
-          1. HERO SECTION (Exact visual reproduction of reference screenshot)
+          1. HERO SECTION (Dynamically managed from Admin Dashboard)
          ========================================================================= */}
       <section className="relative bg-[#FFF9F2] overflow-hidden border-b border-amber-100/60">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 pb-10 sm:pt-14 sm:pb-16">
@@ -71,19 +83,18 @@ export const HomePage: React.FC<HomePageProps> = ({
             <div className="lg:col-span-6 space-y-4 sm:space-y-5 text-left z-10">
               {/* "Welcome to Boricart" badge pill */}
               <div className="inline-flex items-center gap-1.5 bg-[#FDE8C5] text-[#D98200] px-3.5 py-1 rounded-full text-xs font-bold tracking-tight">
-                <span>Welcome to Boricart</span>
+                <span>{heroTagline}</span>
               </div>
 
               {/* Main Headline */}
               <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black text-[#111111] tracking-tight leading-[1.08]">
-                Everyday Solutions. <br />
-                <span className="text-[#F5A623]">Better Living.</span>
+                {heroHeadline} <br />
+                <span className="text-[#F5A623]">{heroSubhead}</span>
               </h1>
 
               {/* Supporting Text */}
               <p className="text-sm sm:text-base text-gray-700 max-w-md leading-relaxed font-medium">
-                Discover practical products designed to make everyday life easier, smarter and more
-                convenient.
+                {heroDescription}
               </p>
 
               {/* Orange Shop Now Pill Button */}
@@ -92,7 +103,7 @@ export const HomePage: React.FC<HomePageProps> = ({
                   onClick={() => onNavigate('shop')}
                   className="bg-[#F5A623] hover:bg-[#D98200] text-black hover:text-white font-extrabold px-8 py-3.5 rounded-full shadow-md hover:shadow-lg transition-all inline-flex items-center gap-2 text-sm sm:text-base group"
                 >
-                  <span>Shop Now</span>
+                  <span>{heroButtonText}</span>
                   <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform stroke-[2.5]" />
                 </button>
               </div>
@@ -106,15 +117,15 @@ export const HomePage: React.FC<HomePageProps> = ({
               </div>
             </div>
 
-            {/* Right Hero Image (Couple pointing, exact composition from screenshot) */}
+            {/* Right Hero Image (Selected image with clean frame and Cash on Delivery badge) */}
             <div className="lg:col-span-6 relative flex justify-center lg:justify-end">
-              <div className="relative w-full max-w-lg lg:max-w-none aspect-[4/3] sm:aspect-[16/11] rounded-3xl overflow-hidden shadow-sm">
+              <div className="relative w-full max-w-md lg:max-w-lg aspect-[3/4] sm:aspect-[4/5] rounded-3xl overflow-hidden shadow-xl border-4 border-white bg-gradient-to-b from-amber-100/30 to-orange-100/20">
                 <img
-                  src="https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=1000&q=80"
-                  alt="Everyday Solutions. Better Living with Boricart"
-                  className="w-full h-full object-cover object-top"
+                  src={heroImage}
+                  alt={`${heroHeadline} ${heroSubhead} - Boricart`}
+                  className="w-full h-full object-cover object-top hover:scale-103 transition-transform duration-500"
                 />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent flex items-end p-6">
+                <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent flex items-end p-5">
                   <div className="bg-white/95 backdrop-blur-xs px-4 py-2 rounded-2xl shadow-sm text-xs font-bold text-gray-900 flex items-center gap-2">
                     <ShieldCheck className="w-4 h-4 text-emerald-600" />
                     <span>Nationwide Pay on Delivery • Inspect before payment</span>

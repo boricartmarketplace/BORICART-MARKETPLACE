@@ -20,6 +20,10 @@ import {
   RotateCcw,
   Sparkles,
   Filter,
+  Upload,
+  Image as ImageIcon,
+  Layout,
+  RefreshCw,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { Product, Category, Order, OrderStatus, PaymentStatus, StoreSettings } from '../../types';
@@ -32,6 +36,7 @@ import {
   updateOrderStatus,
   updateStoreSettings,
   seedInitialDatabase,
+  uploadProductImage,
 } from '../../firebase/services';
 import { ProductFormModal } from './ProductFormModal';
 import { CategoryFormModal } from './CategoryFormModal';
@@ -79,6 +84,29 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [freeDeliveryThreshold, setFreeDeliveryThreshold] = useState<number>(settings.freeDeliveryThreshold);
   const [supportEmail, setSupportEmail] = useState(settings.supportEmail);
   const [supportPhone, setSupportPhone] = useState(settings.supportPhone);
+
+  // Hero Section Customizer state
+  const [heroImage, setHeroImage] = useState<string>(
+    settings.heroImage || '/assets/aistudio/image_11326346.png'
+  );
+  const [heroTagline, setHeroTagline] = useState<string>(
+    settings.heroTagline || 'Welcome to Boricart'
+  );
+  const [heroHeadline, setHeroHeadline] = useState<string>(
+    settings.heroHeadline || 'Everyday Solutions.'
+  );
+  const [heroSubhead, setHeroSubhead] = useState<string>(
+    settings.heroSubhead || 'Better Living.'
+  );
+  const [heroDescription, setHeroDescription] = useState<string>(
+    settings.heroDescription ||
+      'Discover practical products designed to make everyday life easier, smarter and more convenient.'
+  );
+  const [heroButtonText, setHeroButtonText] = useState<string>(
+    settings.heroButtonText || 'Shop Now'
+  );
+  const [isUploadingHero, setIsUploadingHero] = useState<boolean>(false);
+
   const [settingsSuccess, setSettingsSuccess] = useState(false);
   const [isSeeding, setIsSeeding] = useState(false);
 
@@ -89,6 +117,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     setFreeDeliveryThreshold(settings.freeDeliveryThreshold);
     setSupportEmail(settings.supportEmail);
     setSupportPhone(settings.supportPhone);
+    setHeroImage(settings.heroImage || '/assets/aistudio/image_11326346.png');
+    setHeroTagline(settings.heroTagline || 'Welcome to Boricart');
+    setHeroHeadline(settings.heroHeadline || 'Everyday Solutions.');
+    setHeroSubhead(settings.heroSubhead || 'Better Living.');
+    setHeroDescription(
+      settings.heroDescription ||
+        'Discover practical products designed to make everyday life easier, smarter and more convenient.'
+    );
+    setHeroButtonText(settings.heroButtonText || 'Shop Now');
   }, [settings]);
 
   // Analytics Metrics
@@ -191,6 +228,21 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     }
   };
 
+  // Handle Hero Image File Upload
+  const handleHeroFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      setIsUploadingHero(true);
+      const url = await uploadProductImage(file);
+      setHeroImage(url);
+    } catch (err) {
+      console.error('Error uploading hero image:', err);
+    } finally {
+      setIsUploadingHero(false);
+    }
+  };
+
   // Handle Settings Save
   const handleSaveSettings = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -200,6 +252,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       freeDeliveryThreshold: Number(freeDeliveryThreshold),
       supportEmail,
       supportPhone,
+      heroImage,
+      heroTagline,
+      heroHeadline,
+      heroSubhead,
+      heroDescription,
+      heroButtonText,
     });
     await onRefreshData();
     setSettingsSuccess(true);
@@ -226,16 +284,23 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       <div className="bg-[#1F1F1F] text-white border-b border-gray-800 sticky top-0 z-30 shadow-md">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-lg bg-[#F5A623] flex items-center justify-center text-black font-black text-base">
-                B
+            <div
+              className="flex items-center gap-3 cursor-pointer"
+              onClick={() => onNavigate('home')}
+            >
+              <div className="bg-white px-2.5 py-1 rounded-xl flex items-center shadow-xs">
+                <img
+                  src="/assets/aistudio/image_af74bfee.png"
+                  alt="BORICART"
+                  className="h-6 sm:h-7 w-auto object-contain"
+                />
               </div>
-              <div>
-                <span className="font-black text-sm tracking-tight text-white">
-                  BORICART <span className="text-[#F5A623]">ADMIN</span>
+              <div className="hidden sm:block">
+                <span className="font-black text-xs tracking-tight text-white uppercase block">
+                  Admin Portal
                 </span>
-                <span className="text-[10px] text-gray-400 block -mt-1">
-                  Cloud Management Portal
+                <span className="text-[10px] text-gray-400 block -mt-0.5">
+                  Cloud Management
                 </span>
               </div>
             </div>
@@ -477,6 +542,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   >
                     <Plus className="w-4 h-4" />
                     <span>Create Category</span>
+                  </button>
+
+                  <button
+                    onClick={() => setActiveTab('settings')}
+                    className="w-full bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 font-bold p-3 rounded-2xl flex items-center justify-center gap-2 text-xs transition-colors"
+                  >
+                    <Layout className="w-4 h-4 text-[#F5A623]" />
+                    <span>Customize Hero Section</span>
                   </button>
 
                   <button
@@ -897,99 +970,309 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           </div>
         )}
 
-        {/* TAB 5: STORE SETTINGS */}
+        {/* TAB 5: STORE SETTINGS & HERO CUSTOMIZATION */}
         {activeTab === 'settings' && (
-          <div className="max-w-2xl bg-white rounded-3xl border border-gray-100 p-6 sm:p-10 shadow-xs space-y-6">
+          <div className="space-y-8 max-w-4xl">
+            {/* Header */}
             <div>
-              <h3 className="font-extrabold text-xl text-[#333333]">Store Configuration</h3>
+              <h3 className="font-black text-2xl text-[#333333]">Store & Website Configuration</h3>
               <p className="text-xs text-gray-500 mt-1">
-                Manage WhatsApp business number, delivery fee calculation, and customer support channels.
+                Customize your homepage hero banner image and messaging, WhatsApp click-to-chat, delivery fees, and contact info.
               </p>
             </div>
 
             {settingsSuccess && (
-              <div className="p-4 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold rounded-xl flex items-center gap-2">
-                <CheckCircle2 className="w-5 h-5 text-emerald-600" />
-                <span>Store settings saved successfully to Cloud Firestore!</span>
+              <div className="p-4 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold rounded-2xl flex items-center gap-2 shadow-xs">
+                <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
+                <span>Store & Hero settings successfully saved to Cloud Firestore! Homepage will update immediately.</span>
               </div>
             )}
 
-            <form onSubmit={handleSaveSettings} className="space-y-4">
-              <div>
-                <label className="block text-xs font-bold text-gray-700 mb-1">
-                  Boricart WhatsApp Business Number (Click-to-chat)
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="+2348140008921"
-                  value={whatsappNumber}
-                  onChange={(e) => setWhatsappNumber(e.target.value)}
-                  className="w-full text-sm bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 focus:bg-white focus:outline-none focus:border-[#F5A623]"
-                />
-                <span className="text-[11px] text-gray-400 mt-0.5 block">
-                  All customer inquiry and order tracking buttons route to this number.
-                </span>
-              </div>
+            <form onSubmit={handleSaveSettings} className="space-y-8">
+              {/* CARD 1: HERO SECTION CUSTOMIZATION */}
+              <div className="bg-white rounded-3xl border border-gray-100 p-6 sm:p-8 shadow-xs space-y-6">
+                <div className="flex items-center justify-between pb-4 border-b border-gray-100">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-2xl bg-amber-50 text-[#F5A623] flex items-center justify-center font-bold">
+                      <Layout className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h4 className="font-extrabold text-base text-[#333333]">Hero Banner Customization</h4>
+                      <p className="text-xs text-gray-500">
+                        Update the hero image, headlines, and call-to-action button on the homepage.
+                      </p>
+                    </div>
+                  </div>
+                </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* Live Preview Card */}
                 <div>
-                  <label className="block text-xs font-bold text-gray-700 mb-1">
-                    Standard Delivery Fee (NGN)
+                  <label className="block text-xs font-bold text-gray-700 mb-2">
+                    Live Banner Preview
                   </label>
-                  <input
-                    type="number"
-                    required
-                    min="0"
-                    value={deliveryFee}
-                    onChange={(e) => setDeliveryFee(Number(e.target.value))}
-                    className="w-full text-sm bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 focus:bg-white focus:outline-none focus:border-[#F5A623]"
-                  />
+                  <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-[#FFF8EE] via-[#FFFBF6] to-[#FFF4E0] border border-amber-100/80 p-6 sm:p-8 shadow-xs">
+                    <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-center">
+                      <div className="md:col-span-7 space-y-3">
+                        <span className="inline-block px-3 py-1 bg-[#F5A623]/15 text-[#D98200] font-bold text-[10px] sm:text-xs rounded-full">
+                          {heroTagline || 'Welcome to Boricart'}
+                        </span>
+                        <h2 className="text-xl sm:text-3xl font-black text-[#333333] tracking-tight leading-tight">
+                          {heroHeadline || 'Everyday Solutions.'}
+                          <span className="block text-[#F5A623]">{heroSubhead || 'Better Living.'}</span>
+                        </h2>
+                        <p className="text-xs text-gray-600 line-clamp-2">
+                          {heroDescription || 'Discover practical products designed to make everyday life easier, smarter and more convenient.'}
+                        </p>
+                        <div>
+                          <button
+                            type="button"
+                            className="bg-[#F5A623] text-white font-bold text-xs px-5 py-2.5 rounded-xl shadow-xs pointer-events-none"
+                          >
+                            {heroButtonText || 'Shop Now'} →
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="md:col-span-5 flex justify-center">
+                        <div className="relative w-40 sm:w-48 aspect-[4/5] rounded-2xl overflow-hidden bg-amber-100/50 shadow-md border-2 border-white">
+                          <img
+                            src={heroImage || '/assets/aistudio/image_11326346.png'}
+                            alt="Hero Preview"
+                            className="w-full h-full object-cover object-top"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
 
-                <div>
-                  <label className="block text-xs font-bold text-gray-700 mb-1">
-                    Free Delivery Threshold (NGN)
+                {/* Hero Image Management */}
+                <div className="space-y-4 pt-2">
+                  <label className="block text-xs font-bold text-gray-700">
+                    Hero Section Image
                   </label>
-                  <input
-                    type="number"
-                    required
-                    min="0"
-                    value={freeDeliveryThreshold}
-                    onChange={(e) => setFreeDeliveryThreshold(Number(e.target.value))}
-                    className="w-full text-sm bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 focus:bg-white focus:outline-none focus:border-[#F5A623]"
-                  />
+
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+                    <div className="w-24 h-28 rounded-2xl border-2 border-gray-100 overflow-hidden bg-gray-50 shrink-0 relative group">
+                      <img
+                        src={heroImage}
+                        alt="Hero"
+                        className="w-full h-full object-cover object-top"
+                      />
+                    </div>
+
+                    <div className="flex-1 space-y-3 w-full">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <label className="cursor-pointer bg-white border border-gray-200 hover:border-[#F5A623] hover:text-[#F5A623] text-gray-700 text-xs font-bold px-4 py-2 rounded-xl flex items-center gap-2 shadow-2xs transition-colors">
+                          <Upload className="w-4 h-4" />
+                          <span>{isUploadingHero ? 'Uploading image...' : 'Upload New Image'}</span>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            disabled={isUploadingHero}
+                            onChange={handleHeroFileUpload}
+                            className="hidden"
+                          />
+                        </label>
+
+                        <button
+                          type="button"
+                          onClick={() => setHeroImage('/assets/aistudio/image_11326346.png')}
+                          className="bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 text-xs font-bold px-3 py-2 rounded-xl flex items-center gap-1.5 transition-colors"
+                        >
+                          <Sparkles className="w-3.5 h-3.5 text-[#F5A623]" />
+                          <span>Use Boy Portrait (Provided)</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => setHeroImage('/assets/aistudio/image_58c04f55.png')}
+                          className="bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold px-3 py-2 rounded-xl flex items-center gap-1.5 transition-colors"
+                        >
+                          <ImageIcon className="w-3.5 h-3.5 text-gray-500" />
+                          <span>Use Couple Lifestyle</span>
+                        </button>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          placeholder="Or paste an image URL or path (/assets/...)"
+                          value={heroImage}
+                          onChange={(e) => setHeroImage(e.target.value)}
+                          className="w-full text-xs bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 focus:bg-white focus:outline-none focus:border-[#F5A623]"
+                        />
+                      </div>
+                      <p className="text-[11px] text-gray-400">
+                        Supports local asset paths (e.g. <code>/assets/aistudio/image_11326346.png</code>) or any web image URL.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Hero Text Customization Fields */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 mb-1">
+                      Welcome Tagline / Pill
+                    </label>
+                    <input
+                      type="text"
+                      value={heroTagline}
+                      onChange={(e) => setHeroTagline(e.target.value)}
+                      placeholder="Welcome to Boricart"
+                      className="w-full text-xs bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2.5 focus:bg-white focus:outline-none focus:border-[#F5A623]"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 mb-1">
+                      Call to Action Button Text
+                    </label>
+                    <input
+                      type="text"
+                      value={heroButtonText}
+                      onChange={(e) => setHeroButtonText(e.target.value)}
+                      placeholder="Shop Now"
+                      className="w-full text-xs bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2.5 focus:bg-white focus:outline-none focus:border-[#F5A623]"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 mb-1">
+                      Headline Line 1
+                    </label>
+                    <input
+                      type="text"
+                      value={heroHeadline}
+                      onChange={(e) => setHeroHeadline(e.target.value)}
+                      placeholder="Everyday Solutions."
+                      className="w-full text-xs bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2.5 focus:bg-white focus:outline-none focus:border-[#F5A623]"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 mb-1">
+                      Headline Line 2 (Orange Accent)
+                    </label>
+                    <input
+                      type="text"
+                      value={heroSubhead}
+                      onChange={(e) => setHeroSubhead(e.target.value)}
+                      placeholder="Better Living."
+                      className="w-full text-xs bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2.5 focus:bg-white focus:outline-none focus:border-[#F5A623]"
+                    />
+                  </div>
+
+                  <div className="sm:col-span-2">
+                    <label className="block text-xs font-bold text-gray-700 mb-1">
+                      Supporting Description
+                    </label>
+                    <textarea
+                      rows={2}
+                      value={heroDescription}
+                      onChange={(e) => setHeroDescription(e.target.value)}
+                      placeholder="Discover practical products designed to make everyday life easier, smarter and more convenient."
+                      className="w-full text-xs bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2.5 focus:bg-white focus:outline-none focus:border-[#F5A623]"
+                    />
+                  </div>
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-bold text-gray-700 mb-1">Support Email</label>
-                  <input
-                    type="email"
-                    value={supportEmail}
-                    onChange={(e) => setSupportEmail(e.target.value)}
-                    className="w-full text-sm bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 focus:bg-white focus:outline-none focus:border-[#F5A623]"
-                  />
+              {/* CARD 2: WHATSAPP & DELIVERY CONFIGURATION */}
+              <div className="bg-white rounded-3xl border border-gray-100 p-6 sm:p-8 shadow-xs space-y-6">
+                <div className="flex items-center gap-3 pb-4 border-b border-gray-100">
+                  <div className="w-10 h-10 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
+                    <Phone className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h4 className="font-extrabold text-base text-[#333333]">WhatsApp, Delivery & Support</h4>
+                    <p className="text-xs text-gray-500">
+                      Configure customer order routing, delivery fees across Nigeria, and support channels.
+                    </p>
+                  </div>
                 </div>
 
-                <div>
-                  <label className="block text-xs font-bold text-gray-700 mb-1">Support Phone</label>
-                  <input
-                    type="text"
-                    value={supportPhone}
-                    onChange={(e) => setSupportPhone(e.target.value)}
-                    className="w-full text-sm bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 focus:bg-white focus:outline-none focus:border-[#F5A623]"
-                  />
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 mb-1">
+                      Boricart WhatsApp Business Number (Click-to-chat)
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="+2348140008921"
+                      value={whatsappNumber}
+                      onChange={(e) => setWhatsappNumber(e.target.value)}
+                      className="w-full text-sm bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 focus:bg-white focus:outline-none focus:border-[#F5A623]"
+                    />
+                    <span className="text-[11px] text-gray-400 mt-1 block">
+                      All customer inquiry and order tracking buttons route directly to this WhatsApp number.
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-bold text-gray-700 mb-1">
+                        Standard Delivery Fee (NGN)
+                      </label>
+                      <input
+                        type="number"
+                        required
+                        min="0"
+                        value={deliveryFee}
+                        onChange={(e) => setDeliveryFee(Number(e.target.value))}
+                        className="w-full text-sm bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 focus:bg-white focus:outline-none focus:border-[#F5A623]"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-gray-700 mb-1">
+                        Free Delivery Threshold (NGN)
+                      </label>
+                      <input
+                        type="number"
+                        required
+                        min="0"
+                        value={freeDeliveryThreshold}
+                        onChange={(e) => setFreeDeliveryThreshold(Number(e.target.value))}
+                        className="w-full text-sm bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 focus:bg-white focus:outline-none focus:border-[#F5A623]"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-bold text-gray-700 mb-1">Support Email</label>
+                      <input
+                        type="email"
+                        value={supportEmail}
+                        onChange={(e) => setSupportEmail(e.target.value)}
+                        className="w-full text-sm bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 focus:bg-white focus:outline-none focus:border-[#F5A623]"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-gray-700 mb-1">Support Phone</label>
+                      <input
+                        type="text"
+                        value={supportPhone}
+                        onChange={(e) => setSupportPhone(e.target.value)}
+                        className="w-full text-sm bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 focus:bg-white focus:outline-none focus:border-[#F5A623]"
+                      />
+                    </div>
+                  </div>
                 </div>
               </div>
 
-              <div className="pt-4 flex items-center justify-between">
+              {/* Submit Buttons */}
+              <div className="pt-2 flex items-center justify-between">
                 <button
                   type="submit"
-                  className="bg-[#F5A623] hover:bg-[#D98200] text-white font-bold py-3 px-6 rounded-xl text-xs shadow-xs transition-all"
+                  className="bg-[#F5A623] hover:bg-[#D98200] text-white font-black py-3.5 px-8 rounded-2xl text-xs sm:text-sm shadow-md hover:shadow-lg transition-all flex items-center gap-2"
                 >
-                  Save Store Settings
+                  <CheckCircle2 className="w-4 h-4" />
+                  <span>Save All Store & Hero Settings</span>
                 </button>
               </div>
             </form>

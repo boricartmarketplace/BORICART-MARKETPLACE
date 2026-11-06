@@ -99,6 +99,7 @@ function MainApp() {
           <HomePage
             products={products}
             categories={categories}
+            settings={settings}
             onNavigate={handleNavigate}
             whatsappNumber={settings.whatsappNumber}
           />
@@ -246,6 +247,7 @@ function MainApp() {
           <HomePage
             products={products}
             categories={categories}
+            settings={settings}
             onNavigate={handleNavigate}
             whatsappNumber={settings.whatsappNumber}
           />

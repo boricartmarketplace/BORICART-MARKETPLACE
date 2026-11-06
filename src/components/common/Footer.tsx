@@ -22,17 +22,13 @@ export const Footer: React.FC<FooterProps> = ({
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-12 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-10">
         {/* Brand info */}
         <div className="lg:col-span-2 space-y-4">
-          <div className="flex items-center gap-2.5 cursor-pointer" onClick={() => onNavigate('home')}>
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#F5A623] to-[#D98200] flex items-center justify-center text-white font-black text-xl shadow-xs">
-              B
-            </div>
-            <div className="flex flex-col">
-              <span className="text-2xl font-black tracking-tight text-white">
-                Bori<span className="text-[#F5A623]">cart</span>
-              </span>
-              <span className="text-[10px] text-gray-400 font-semibold tracking-wider uppercase -mt-1">
-                Everyday Solutions. Better Living.
-              </span>
+          <div className="flex items-center gap-3 cursor-pointer" onClick={() => onNavigate('home')}>
+            <div className="bg-white px-3.5 py-1.5 rounded-2xl shadow-sm inline-flex items-center">
+              <img
+                src="/assets/aistudio/image_af74bfee.png"
+                alt="BORICART — Everyday Solutions. Better Living."
+                className="h-9 w-auto object-contain"
+              />
             </div>
           </div>
 
