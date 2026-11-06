@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { CartProvider, useCart } from './context/CartContext';
+import { WishlistProvider } from './context/WishlistContext';
 import { Header } from './components/common/Header';
 import { Footer } from './components/common/Footer';
 import { CartDrawer } from './components/common/CartDrawer';
+import { MobileBottomBar } from './components/common/MobileBottomBar';
 import { WhatsAppButton } from './components/common/WhatsAppButton';
 import { HomePage } from './pages/HomePage';
 import { ShopPage } from './pages/ShopPage';
@@ -22,8 +24,6 @@ import {
   getCategories,
   getOrders,
   getStoreSettings,
-  getProductBySlug,
-  getOrderById,
 } from './firebase/services';
 import { DEFAULT_SETTINGS } from './data/initialCatalog';
 
@@ -110,6 +110,8 @@ function MainApp() {
             products={products}
             categories={categories}
             initialSearch={routeParams.search || ''}
+            initialCollection={routeParams.collection}
+            initialFilter={routeParams.filter}
             onNavigate={handleNavigate}
             whatsappNumber={settings.whatsappNumber}
           />
@@ -133,7 +135,7 @@ function MainApp() {
               <p className="text-gray-500 text-sm">Product not found.</p>
               <button
                 onClick={() => handleNavigate('shop')}
-                className="mt-4 px-4 py-2 bg-[#F5A623] text-white rounded-xl text-xs font-bold"
+                className="mt-4 px-4 py-2 bg-[#F5A623] text-black font-bold rounded-xl text-xs"
               >
                 Return to Shop
               </button>
@@ -146,6 +148,7 @@ function MainApp() {
             allProducts={products}
             onNavigate={handleNavigate}
             whatsappNumber={settings.whatsappNumber}
+            deliveryFee={settings.deliveryFee}
           />
         );
 
@@ -293,9 +296,18 @@ function MainApp() {
         />
       )}
 
+      {/* Fixed Bottom Mobile Navigation Bar (Section 14 & Reference Screenshot) */}
+      {!isAdminView && (
+        <MobileBottomBar
+          currentRoute={currentRoute}
+          onNavigate={handleNavigate}
+          onOpenSearch={() => handleNavigate('shop')}
+        />
+      )}
+
       {/* Cart Toast Notification */}
       {toastMessage && (
-        <div className="fixed bottom-6 left-6 z-50 bg-[#333333] text-white text-xs font-semibold px-4 py-3 rounded-2xl shadow-xl flex items-center gap-3 animate-in fade-in slide-in-from-bottom-2">
+        <div className="fixed bottom-20 lg:bottom-6 left-6 z-50 bg-[#222222] text-white text-xs font-semibold px-4 py-3 rounded-2xl shadow-xl flex items-center gap-3 animate-in fade-in slide-in-from-bottom-2">
           <span>{toastMessage}</span>
           <button
             onClick={() => {
@@ -315,9 +327,11 @@ function MainApp() {
 export default function App() {
   return (
     <AuthProvider>
-      <CartProvider>
-        <MainApp />
-      </CartProvider>
+      <WishlistProvider>
+        <CartProvider>
+          <MainApp />
+        </CartProvider>
+      </WishlistProvider>
     </AuthProvider>
   );
 }

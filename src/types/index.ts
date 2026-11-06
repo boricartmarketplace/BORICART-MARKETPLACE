@@ -9,6 +9,7 @@ export interface Product {
   promotionalPrice?: number;
   categoryId: string;
   categoryName: string;
+  collectionId?: string;
   tags: string[];
   mainImage: string;
   images: string[];
@@ -16,6 +17,11 @@ export interface Product {
   stockStatus: 'in_stock' | 'low_stock' | 'out_of_stock';
   specifications: string;
   usageInstructions: string;
+  headline?: string;
+  problem?: string;
+  solution?: string;
+  benefits?: string[];
+  videoUrl?: string;
   status: 'draft' | 'published';
   isFeatured: boolean;
   isBestSeller: boolean;
@@ -31,9 +37,20 @@ export interface Category {
   slug: string;
   description: string;
   image: string;
+  iconName?: string;
   productCount: number;
   sortOrder: number;
   createdAt: string;
+}
+
+export interface CollectionItem {
+  id: string;
+  name: string;
+  slug: string;
+  description: string;
+  image: string;
+  productThumbnails: string[];
+  badge?: string;
 }
 
 export interface OrderItem {
@@ -62,6 +79,7 @@ export interface Order {
   orderNumber: string;
   customerName: string;
   phone: string;
+  whatsappNumber?: string;
   email?: string;
   state: string;
   city: string;
@@ -90,6 +108,9 @@ export interface StoreSettings {
   supportPhone: string;
   deliveryFee: number;
   freeDeliveryThreshold: number;
+  heroImage?: string;
+  heroHeadline?: string;
+  heroSubhead?: string;
   updatedAt: string;
 }
 

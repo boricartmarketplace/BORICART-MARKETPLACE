@@ -1,5 +1,5 @@
-import React, { useState, useMemo } from 'react';
-import { Filter, SlidersHorizontal, Search, RotateCcw, ChevronDown, Check } from 'lucide-react';
+import React, { useState, useMemo, useEffect } from 'react';
+import { Filter, SlidersHorizontal, Search, RotateCcw, ChevronDown, Check, Flame } from 'lucide-react';
 import { Product, Category } from '../types';
 import { ProductCard } from '../components/common/ProductCard';
 import { formatNaira } from '../firebase/services';
@@ -9,6 +9,8 @@ interface ShopPageProps {
   categories: Category[];
   initialCategory?: string;
   initialSearch?: string;
+  initialCollection?: string;
+  initialFilter?: string;
   onNavigate: (page: string, params?: Record<string, any>) => void;
   whatsappNumber?: string;
 }
@@ -18,6 +20,8 @@ export const ShopPage: React.FC<ShopPageProps> = ({
   categories,
   initialCategory,
   initialSearch = '',
+  initialCollection,
+  initialFilter,
   onNavigate,
   whatsappNumber = '+2348140008921',
 }) => {
@@ -25,8 +29,16 @@ export const ShopPage: React.FC<ShopPageProps> = ({
   const [searchQuery, setSearchQuery] = useState<string>(initialSearch);
   const [sortBy, setSortBy] = useState<'newest' | 'price-asc' | 'price-desc' | 'popular'>('popular');
   const [inStockOnly, setInStockOnly] = useState<boolean>(false);
-  const [maxPrice, setMaxPrice] = useState<number>(50000);
-  const [isFilterDrawerOpen, setIsFilterDrawerOpen] = useState<boolean>(false);
+  const [dealsOnly, setDealsOnly] = useState<boolean>(initialFilter === 'deals');
+  const [maxPrice, setMaxPrice] = useState<number>(60000);
+  const [selectedCollection, setSelectedCollection] = useState<string | undefined>(initialCollection);
+
+  useEffect(() => {
+    if (initialCategory) setSelectedCategory(initialCategory);
+    if (initialSearch) setSearchQuery(initialSearch);
+    if (initialCollection) setSelectedCollection(initialCollection);
+    if (initialFilter === 'deals') setDealsOnly(true);
+  }, [initialCategory, initialSearch, initialCollection, initialFilter]);
 
   // Filter published products only
   const publishedProducts = useMemo(
@@ -49,6 +61,14 @@ export const ShopPage: React.FC<ShopPageProps> = ({
           if (p.categoryId !== selectedCategory && p.categoryId !== activeCategoryObj?.id) {
             return false;
           }
+        }
+        // Collection
+        if (selectedCollection) {
+          if (p.collectionId !== selectedCollection) return false;
+        }
+        // Deals only
+        if (dealsOnly) {
+          if (!p.promotionalPrice || p.promotionalPrice >= p.regularPrice) return false;
         }
         // Search
         if (searchQuery.trim()) {
@@ -78,161 +98,174 @@ export const ShopPage: React.FC<ShopPageProps> = ({
         if (sortBy === 'popular') return (b.reviewCount || 0) - (a.reviewCount || 0);
         return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
       });
-  }, [publishedProducts, selectedCategory, activeCategoryObj, searchQuery, inStockOnly, maxPrice, sortBy]);
+  }, [
+    publishedProducts,
+    selectedCategory,
+    activeCategoryObj,
+    selectedCollection,
+    dealsOnly,
+    searchQuery,
+    inStockOnly,
+    maxPrice,
+    sortBy,
+  ]);
 
   const resetFilters = () => {
     setSelectedCategory('all');
+    setSelectedCollection(undefined);
+    setDealsOnly(false);
     setSearchQuery('');
     setSortBy('popular');
     setInStockOnly(false);
-    setMaxPrice(50000);
+    setMaxPrice(60000);
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12">
-      {/* Category Banner if specific category selected */}
-      {activeCategoryObj ? (
-        <div className="relative rounded-3xl overflow-hidden bg-gradient-to-r from-gray-900 to-[#333333] text-white p-8 sm:p-12 mb-8 shadow-sm">
-          <div className="max-w-2xl relative z-10 space-y-2">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12 space-y-8">
+      {/* Category or Deals Banner */}
+      {dealsOnly ? (
+        <div className="rounded-3xl bg-gradient-to-r from-amber-500 via-[#F5A623] to-amber-600 text-white p-6 sm:p-10 shadow-sm flex items-center justify-between">
+          <div className="space-y-1">
+            <span className="text-xs font-black uppercase tracking-wider text-black bg-white/90 px-3 py-1 rounded-full">
+              Special Offers
+            </span>
+            <h1 className="text-2xl sm:text-3xl font-black">Boricart Deals & Discounts</h1>
+            <p className="text-xs sm:text-sm text-amber-50">
+              Limited-time discounts on our practical solutions. Pay on delivery nationwide.
+            </p>
+          </div>
+          <Flame className="w-12 h-12 text-white/30 hidden sm:block" />
+        </div>
+      ) : activeCategoryObj ? (
+        <div className="relative rounded-3xl overflow-hidden bg-[#1A1A1A] text-white p-6 sm:p-10 shadow-sm">
+          <div className="max-w-2xl relative z-10 space-y-1">
             <span className="text-xs uppercase font-extrabold text-[#F5A623] tracking-widest">
               Category Collection
             </span>
-            <h1 className="text-3xl sm:text-4xl font-black">{activeCategoryObj.name}</h1>
-            <p className="text-sm text-gray-300">{activeCategoryObj.description}</p>
-          </div>
-          <div className="absolute right-0 top-0 bottom-0 w-1/3 opacity-20 hidden md:block">
-            <img
-              src={activeCategoryObj.image}
-              alt={activeCategoryObj.name}
-              className="w-full h-full object-cover"
-            />
+            <h1 className="text-2xl sm:text-3xl font-black">{activeCategoryObj.name}</h1>
+            <p className="text-xs sm:text-sm text-gray-300">{activeCategoryObj.description}</p>
           </div>
         </div>
       ) : (
-        <div className="mb-8">
+        <div>
           <span className="text-xs font-bold text-[#F5A623] uppercase tracking-wider">
             All Boricart Products
           </span>
-          <h1 className="text-3xl font-black text-[#333333] tracking-tight mt-1">
-            Shop Everyday Solutions
+          <h1 className="text-2xl sm:text-3xl font-black text-[#111111] tracking-tight mt-1">
+            Everyday Solutions Catalog
           </h1>
-          <p className="text-sm text-gray-500 mt-1">
-            Browse our full range of smart, practical essentials. All products backed by Pay on
-            Delivery.
+          <p className="text-xs text-gray-500 mt-1">
+            Authentic, single-brand essentials engineered for better living. 100% Cash on Delivery.
           </p>
         </div>
       )}
 
-      {/* Main Filter & Control Bar */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-gray-100">
-        {/* Category Pills (Horizontal Scrollable) */}
-        <div className="flex items-center gap-2 overflow-x-auto pb-2 md:pb-0 scrollbar-none">
+      {/* Horizontal Category Filter Pills */}
+      <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none border-b border-gray-100">
+        <button
+          onClick={() => {
+            setSelectedCategory('all');
+            setSelectedCollection(undefined);
+            setDealsOnly(false);
+          }}
+          className={`px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all ${
+            selectedCategory === 'all' && !dealsOnly && !selectedCollection
+              ? 'bg-[#111111] text-white shadow-xs'
+              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+          }`}
+        >
+          All Products ({publishedProducts.length})
+        </button>
+
+        <button
+          onClick={() => {
+            setDealsOnly(!dealsOnly);
+            setSelectedCategory('all');
+          }}
+          className={`px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all flex items-center gap-1.5 ${
+            dealsOnly
+              ? 'bg-[#F5A623] text-black shadow-xs font-black'
+              : 'bg-amber-50 text-[#D98200] hover:bg-amber-100'
+          }`}
+        >
+          <Flame className="w-3.5 h-3.5 fill-current" />
+          <span>Deals & Discounts</span>
+        </button>
+
+        {categories.map((cat) => (
           <button
-            onClick={() => setSelectedCategory('all')}
-            className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold whitespace-nowrap transition-all ${
-              selectedCategory === 'all'
-                ? 'bg-[#333333] text-white shadow-xs'
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+            key={cat.id}
+            onClick={() => {
+              setSelectedCategory(cat.id);
+              setSelectedCollection(undefined);
+              setDealsOnly(false);
+            }}
+            className={`px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all ${
+              selectedCategory === cat.id && !dealsOnly
+                ? 'bg-[#F5A623] text-black shadow-xs'
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
             }`}
           >
-            All Products ({publishedProducts.length})
+            {cat.name}
           </button>
-          {categories.map((cat) => (
-            <button
-              key={cat.id}
-              onClick={() => setSelectedCategory(cat.id)}
-              className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold whitespace-nowrap transition-all ${
-                selectedCategory === cat.id
-                  ? 'bg-[#F5A623] text-white shadow-xs'
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-              }`}
-            >
-              {cat.name}
-            </button>
-          ))}
-        </div>
-
-        {/* Sort & Mobile Filter Toggle */}
-        <div className="flex items-center gap-3 self-end md:self-auto">
-          <button
-            onClick={() => setIsFilterDrawerOpen(!isFilterDrawerOpen)}
-            className="md:hidden flex items-center gap-1.5 px-3 py-2 bg-gray-100 hover:bg-gray-200 rounded-xl text-xs font-bold text-gray-700"
-          >
-            <Filter className="w-4 h-4 text-[#F5A623]" />
-            <span>Filters</span>
-          </button>
-
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-gray-500 hidden sm:inline">Sort by:</span>
-            <select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value as any)}
-              className="bg-gray-50 text-xs sm:text-sm font-semibold text-gray-800 border border-gray-200 rounded-xl px-3 py-2 focus:outline-none focus:border-[#F5A623]"
-            >
-              <option value="popular">Most Popular</option>
-              <option value="newest">Newest Arrivals</option>
-              <option value="price-asc">Price: Low to High</option>
-              <option value="price-desc">Price: High to Low</option>
-            </select>
-          </div>
-        </div>
+        ))}
       </div>
 
-      {/* Grid with Left Filter Sidebar */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-8 pt-8">
-        {/* Desktop Sidebar Filters */}
+      {/* Main Grid with Sidebar Filters */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
+        {/* Sidebar Filter Box */}
         <div className="hidden md:block space-y-6 bg-white p-5 rounded-2xl border border-gray-100 h-fit sticky top-28">
           <div className="flex items-center justify-between pb-3 border-b border-gray-100">
-            <h3 className="font-bold text-sm text-[#333333] flex items-center gap-2">
-              <SlidersHorizontal className="w-4 h-4 text-[#F5A623]" />
-              <span>Filters</span>
+            <h3 className="font-bold text-xs text-[#111111] uppercase tracking-wider flex items-center gap-2">
+              <SlidersHorizontal className="w-3.5 h-3.5 text-[#F5A623]" />
+              <span>Filter Products</span>
             </h3>
             <button
               onClick={resetFilters}
-              className="text-xs text-[#F5A623] hover:underline flex items-center gap-1"
+              className="text-xs text-[#F5A623] hover:underline flex items-center gap-1 font-semibold"
             >
               <RotateCcw className="w-3 h-3" />
               <span>Reset</span>
             </button>
           </div>
 
-          {/* Search inside catalog */}
+          {/* Keyword Search */}
           <div>
-            <label className="text-xs font-bold text-gray-700 block mb-2">Search Catalog</label>
+            <label className="text-xs font-bold text-gray-700 block mb-1.5">Keyword Search</label>
             <div className="relative">
               <input
                 type="text"
-                placeholder="Filter by keyword..."
+                placeholder="Search catalog..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full text-xs bg-gray-50 border border-gray-200 rounded-lg pl-8 pr-3 py-2 focus:outline-none focus:border-[#F5A623]"
+                className="w-full text-xs bg-gray-50 border border-gray-200 rounded-xl pl-8 pr-3 py-2"
               />
               <Search className="w-3.5 h-3.5 text-gray-400 absolute left-2.5 top-2.5" />
             </div>
           </div>
 
-          {/* Maximum Price Filter */}
+          {/* Price Range Slider */}
           <div>
-            <div className="flex items-center justify-between text-xs mb-2">
+            <div className="flex items-center justify-between text-xs mb-1.5">
               <span className="font-bold text-gray-700">Max Price</span>
               <span className="font-black text-[#F5A623]">{formatNaira(maxPrice)}</span>
             </div>
             <input
               type="range"
-              min="10000"
+              min="2000"
               max="60000"
-              step="2500"
+              step="1000"
               value={maxPrice}
               onChange={(e) => setMaxPrice(Number(e.target.value))}
               className="w-full accent-[#F5A623] cursor-pointer"
             />
             <div className="flex justify-between text-[10px] text-gray-400 mt-1">
-              <span>₦10,000</span>
+              <span>₦2,000</span>
               <span>₦60,000</span>
             </div>
           </div>
 
-          {/* Availability Filter */}
+          {/* In Stock Toggle */}
           <div>
             <label className="flex items-center gap-2 text-xs font-semibold text-gray-700 cursor-pointer">
               <input
@@ -247,40 +280,46 @@ export const ShopPage: React.FC<ShopPageProps> = ({
         </div>
 
         {/* Product Cards Grid */}
-        <div className="md:col-span-3">
-          <div className="flex items-center justify-between text-xs text-gray-500 mb-4">
+        <div className="md:col-span-3 space-y-4">
+          <div className="flex items-center justify-between text-xs text-gray-500">
             <span>
               Showing <strong>{filteredProducts.length}</strong> products
             </span>
-            {searchQuery && (
-              <span>
-                Keyword: "<strong>{searchQuery}</strong>"
-              </span>
-            )}
+            <div className="flex items-center gap-2">
+              <span>Sort:</span>
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as any)}
+                className="bg-gray-50 border border-gray-200 rounded-lg px-2.5 py-1 text-xs font-bold text-gray-800"
+              >
+                <option value="popular">Most Popular</option>
+                <option value="newest">Newest Arrivals</option>
+                <option value="price-asc">Price: Low to High</option>
+                <option value="price-desc">Price: High to Low</option>
+              </select>
+            </div>
           </div>
 
           {filteredProducts.length === 0 ? (
-            <div className="text-center py-16 bg-gray-50/50 rounded-2xl border border-gray-100 p-8">
-              <div className="w-16 h-16 bg-amber-50 rounded-full flex items-center justify-center mx-auto mb-4 text-[#F5A623]">
-                <Search className="w-8 h-8" />
-              </div>
-              <h3 className="text-base font-bold text-[#333333] mb-1">No products match your filters</h3>
-              <p className="text-xs text-gray-500 max-w-sm mx-auto mb-6">
-                Try widening your price range, choosing another category, or clearing your search.
+            <div className="text-center py-16 bg-gray-50/50 rounded-2xl border border-gray-100 p-8 space-y-3">
+              <Search className="w-8 h-8 text-gray-400 mx-auto" />
+              <h3 className="text-sm font-bold text-gray-800">No products match your filters</h3>
+              <p className="text-xs text-gray-500">
+                Try resetting your filters to explore our full Boricart range.
               </p>
               <button
                 onClick={resetFilters}
-                className="bg-[#F5A623] hover:bg-[#D98200] text-white text-xs font-bold px-5 py-2.5 rounded-xl transition-colors"
+                className="px-4 py-2 bg-[#F5A623] text-black font-bold text-xs rounded-xl"
               >
-                Reset All Filters
+                Reset Filters
               </button>
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-              {filteredProducts.map((product) => (
+            <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-6">
+              {filteredProducts.map((p) => (
                 <ProductCard
-                  key={product.id}
-                  product={product}
+                  key={p.id}
+                  product={p}
                   onNavigate={onNavigate}
                   whatsappNumber={whatsappNumber}
                 />
