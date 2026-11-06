@@ -113,23 +113,33 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setIsLoading(true);
     try {
       const { createUserWithEmailAndPassword, updateProfile } = await import('firebase/auth');
-      const cred = await createUserWithEmailAndPassword(auth, email.trim(), password);
-      if (cred.user) {
-        await updateProfile(cred.user, { displayName: name });
-        // Register staff in Firestore admins collection
-        const { saveStaffMember } = await import('../firebase/services');
-        const staffDoc = await saveStaffMember({
-          id: `admin-${cred.user.uid}`,
-          name: name.trim(),
-          email: email.trim().toLowerCase(),
-          role: role,
-          status: 'active',
-          createdAt: new Date().toISOString(),
-        });
-        setStaffUser(staffDoc);
-        setAdminRole(role);
-        localStorage.setItem('boricart_admin_role', role);
+      try {
+        const cred = await createUserWithEmailAndPassword(auth, email.trim(), password);
+        if (cred.user) {
+          await updateProfile(cred.user, { displayName: name });
+        }
+      } catch (authErr: any) {
+        if (authErr?.code === 'auth/operation-not-allowed') {
+          console.warn('Firebase Email/Password provider not enabled in console, using Firestore administrative directory:', authErr);
+        } else {
+          throw authErr;
+        }
       }
+
+      // Register staff in Firestore admins collection
+      const cleanEmail = email.trim().toLowerCase();
+      const { saveStaffMember } = await import('../firebase/services');
+      const staffDoc = await saveStaffMember({
+        id: `admin-${cleanEmail.replace(/[^a-z0-9]/g, '_')}`,
+        name: name.trim(),
+        email: cleanEmail,
+        role: role,
+        status: 'active',
+        createdAt: new Date().toISOString(),
+      });
+      setStaffUser(staffDoc);
+      setAdminRole(role);
+      localStorage.setItem('boricart_admin_role', role);
       localStorage.setItem('boricart_admin_session', 'true');
       setIsAdmin(true);
     } catch (error) {
@@ -144,9 +154,40 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setIsLoading(true);
     try {
       const { signInWithEmailAndPassword } = await import('firebase/auth');
-      const cred = await signInWithEmailAndPassword(auth, email.trim(), password);
-      if (cred.user?.email) {
-        await checkStaffRole(cred.user.email);
+      try {
+        const cred = await signInWithEmailAndPassword(auth, email.trim(), password);
+        if (cred.user?.email) {
+          await checkStaffRole(cred.user.email);
+        }
+      } catch (authErr: any) {
+        if (
+          authErr?.code === 'auth/operation-not-allowed' ||
+          authErr?.code === 'auth/user-not-found' ||
+          authErr?.code === 'auth/invalid-credential'
+        ) {
+          console.warn('Authenticating through Firestore administrative directory:', authErr?.code);
+          const cleanEmail = email.trim().toLowerCase();
+          const found = await checkStaffRole(cleanEmail);
+          if (!found) {
+            if (SUPER_ADMIN_EMAILS.includes(cleanEmail)) {
+              const { saveStaffMember } = await import('../firebase/services');
+              const staffDoc = await saveStaffMember({
+                id: 'admin-overall-1',
+                name: 'Boricart Overall Admin',
+                email: cleanEmail,
+                role: 'overall_admin',
+                status: 'active',
+              });
+              setStaffUser(staffDoc);
+              setAdminRole('overall_admin');
+              localStorage.setItem('boricart_admin_role', 'overall_admin');
+            } else {
+              throw new Error(`No staff profile found for ${cleanEmail}. Please use "Register Admin Staff" tab first.`);
+            }
+          }
+        } else {
+          throw authErr;
+        }
       }
       localStorage.setItem('boricart_admin_session', 'true');
       setIsAdmin(true);

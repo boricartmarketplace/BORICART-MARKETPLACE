@@ -22,6 +22,10 @@ export interface Product {
   solution?: string;
   benefits?: string[];
   videoUrl?: string;
+  productType?: 'physical' | 'digital' | 'bundle' | 'service';
+  costPrice?: number; // Cost of Goods Sold (COGS) in NGN
+  adSpend?: number; // Marketing / Ad cost per unit in NGN
+  offlinePrice?: number; // In-store / Walk-in selling price in NGN
   status: 'draft' | 'published';
   isFeatured: boolean;
   isBestSeller: boolean;
@@ -58,6 +62,8 @@ export interface OrderItem {
   productName: string;
   productImage: string;
   price: number;
+  costPrice?: number;
+  adSpend?: number;
   quantity: number;
   sku?: string;
 }
@@ -88,9 +94,15 @@ export interface Order {
   subtotal: number;
   deliveryFee: number;
   totalAmount: number;
-  paymentMethod: 'cash_on_delivery';
+  costAmount?: number; // Total Cost of Goods Sold
+  adSpendAmount?: number; // Total Ad Spend allocated
+  netProfit?: number; // Revenue - COGS - Ad Spend
+  paymentMethod: 'cash_on_delivery' | 'cash' | 'pos_terminal' | 'bank_transfer' | 'split';
   paymentStatus: PaymentStatus;
   status: OrderStatus;
+  channel?: 'online' | 'offline';
+  salesChannel?: 'online_store' | 'walk_in' | 'offline_pos' | 'direct_whatsapp' | 'exhibition';
+  cashierName?: string;
   notes?: string;
   createdAt: string;
   updatedAt: string;

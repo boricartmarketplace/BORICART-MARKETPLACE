@@ -29,7 +29,8 @@ import {
   ShieldCheck,
   Truck,
   MessageSquare,
-  Building,
+  BarChart3,
+  Receipt,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { Product, Category, Order, OrderStatus, PaymentStatus, StoreSettings, AdminRole, PixelSettings } from '../../types';
@@ -50,6 +51,8 @@ import { OrderDetailsModal } from './OrderDetailsModal';
 import { StaffManagementTab } from './StaffManagementTab';
 import { PagesCmsTab } from './PagesCmsTab';
 import { PixelSettingsCard } from './PixelSettingsCard';
+import { OfflinePosModal } from './OfflinePosModal';
+import { ProfitReportsTab } from './ProfitReportsTab';
 
 interface AdminDashboardProps {
   products: Product[];
@@ -60,7 +63,7 @@ interface AdminDashboardProps {
   onNavigate: (page: string, params?: Record<string, any>) => void;
 }
 
-type TabType = 'overview' | 'products' | 'categories' | 'orders' | 'pages-cms' | 'staff' | 'settings';
+type TabType = 'overview' | 'products' | 'categories' | 'orders' | 'profit-reports' | 'pages-cms' | 'staff' | 'settings';
 
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   products,
@@ -75,16 +78,16 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   // Role permissions:
   // - overall_admin: all tabs
-  // - store_keeper: overview, products, categories
+  // - store_keeper: overview, products, categories, profit-reports
   // - order_dispatcher: overview, orders
   const allowedTabs = useMemo(() => {
     if (adminRole === 'store_keeper') {
-      return ['overview', 'products', 'categories'] as TabType[];
+      return ['overview', 'products', 'categories', 'profit-reports'] as TabType[];
     }
     if (adminRole === 'order_dispatcher') {
       return ['overview', 'orders'] as TabType[];
     }
-    return ['overview', 'products', 'categories', 'orders', 'pages-cms', 'staff', 'settings'] as TabType[];
+    return ['overview', 'products', 'categories', 'orders', 'profit-reports', 'pages-cms', 'staff', 'settings'] as TabType[];
   }, [adminRole]);
 
   // Safety fallback if active tab not allowed
@@ -93,6 +96,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       setActiveTab(allowedTabs[0] || 'overview');
     }
   }, [allowedTabs, activeTab]);
+
+  // POS Walk-in / Offline modal state
+  const [isOfflinePosOpen, setIsOfflinePosOpen] = useState(false);
 
   // Product modals state
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
@@ -444,6 +450,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               </div>
 
               <button
+                onClick={() => setIsOfflinePosOpen(true)}
+                className="flex items-center gap-1.5 bg-[#F5A623] hover:bg-[#D98200] text-black font-extrabold text-xs px-3 py-1.5 rounded-xl shadow-xs transition-all cursor-pointer"
+                title="Record Walk-in Store / Offline POS Sale"
+              >
+                <ShoppingBag className="w-3.5 h-3.5" />
+                <span>Sell Offline (POS)</span>
+              </button>
+
+              <button
                 onClick={() => onNavigate('home')}
                 className="hidden sm:flex items-center gap-1.5 text-xs text-gray-300 hover:text-white px-3 py-1.5 rounded-lg hover:bg-gray-800 transition-colors"
               >
@@ -524,6 +539,20 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   {pendingOrders}
                 </span>
               )}
+            </button>
+          )}
+
+          {allowedTabs.includes('profit-reports') && (
+            <button
+              onClick={() => setActiveTab('profit-reports')}
+              className={`py-3 px-3 text-xs sm:text-sm font-bold border-b-2 whitespace-nowrap transition-all flex items-center gap-1.5 ${
+                activeTab === 'profit-reports'
+                  ? 'border-[#F5A623] text-[#F5A623]'
+                  : 'border-transparent text-gray-400 hover:text-gray-200'
+              }`}
+            >
+              <BarChart3 className="w-3.5 h-3.5" />
+              <span>Profit & Reports</span>
             </button>
           )}
 
@@ -701,6 +730,24 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 </h3>
 
                 <div className="space-y-2.5">
+                  <button
+                    onClick={() => setIsOfflinePosOpen(true)}
+                    className="w-full bg-[#1F1F1F] hover:bg-black text-[#F5A623] border border-[#F5A623]/50 font-bold p-3 rounded-2xl flex items-center justify-center gap-2 text-xs shadow-xs transition-all cursor-pointer"
+                  >
+                    <Receipt className="w-4 h-4 text-[#F5A623]" />
+                    <span>Record Walk-in / Offline POS Sale</span>
+                  </button>
+
+                  {allowedTabs.includes('profit-reports') && (
+                    <button
+                      onClick={() => setActiveTab('profit-reports')}
+                      className="w-full bg-emerald-50 hover:bg-emerald-100 text-emerald-900 border border-emerald-200 font-bold p-3 rounded-2xl flex items-center justify-center gap-2 text-xs transition-colors cursor-pointer"
+                    >
+                      <BarChart3 className="w-4 h-4 text-emerald-600" />
+                      <span>View Profit & Loss Reports (Daily/Annual)</span>
+                    </button>
+                  )}
+
                   {allowedTabs.includes('products') && (
                     <button
                       onClick={() => {
@@ -1165,6 +1212,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               </div>
             </div>
           </div>
+        )}
+
+        {/* TAB 4.5: FINANCIAL & PROFIT REPORTS (DAILY, WEEKLY, MONTHLY, ANNUAL) */}
+        {activeTab === 'profit-reports' && (
+          <ProfitReportsTab orders={orders} products={products} />
         )}
 
         {/* TAB 5: PAGES CMS (EDIT ALL PAGES FROM BACKEND) */}
@@ -1636,6 +1688,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         order={selectedOrder}
         onClose={() => setIsOrderModalOpen(false)}
         onUpdateStatus={handleUpdateOrderStatus}
+      />
+
+      {/* Walk-in Store / Offline POS Sales Modal */}
+      <OfflinePosModal
+        isOpen={isOfflinePosOpen}
+        products={products}
+        onClose={() => setIsOfflinePosOpen(false)}
+        onOrderCreated={onRefreshData}
+        cashierName={staffUser?.name || user?.displayName || 'Overall Admin'}
       />
     </div>
   );

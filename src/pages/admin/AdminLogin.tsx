@@ -66,6 +66,8 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({ onNavigate }) => {
         msg = 'This email is already registered. Please sign in instead.';
       } else if (err.code === 'auth/wrong-password' || err.code === 'auth/user-not-found' || err.code === 'auth/invalid-credential') {
         msg = 'Invalid email or password. Please verify your credentials or register.';
+      } else if (err.code === 'auth/operation-not-allowed') {
+        msg = 'Email/Password provider is not activated in the Firebase Console yet. You can click any of the Quick Access options below to sign in immediately!';
       }
       setError(msg);
     } finally {

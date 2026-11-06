@@ -45,6 +45,10 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
   const [status, setStatus] = useState<'draft' | 'published'>('published');
   const [isFeatured, setIsFeatured] = useState(false);
   const [isBestSeller, setIsBestSeller] = useState(false);
+  const [productType, setProductType] = useState<'physical' | 'digital' | 'bundle' | 'service'>('physical');
+  const [costPrice, setCostPrice] = useState<number | ''>('');
+  const [adSpend, setAdSpend] = useState<number | ''>('');
+  const [offlinePrice, setOfflinePrice] = useState<number | ''>('');
 
   // Images state
   const [images, setImages] = useState<string[]>([]);
@@ -73,6 +77,10 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
       setStatus(product.status);
       setIsFeatured(product.isFeatured);
       setIsBestSeller(product.isBestSeller);
+      setProductType(product.productType || 'physical');
+      setCostPrice(product.costPrice ?? '');
+      setAdSpend(product.adSpend ?? '');
+      setOfflinePrice(product.offlinePrice ?? '');
       setImages(product.images || [product.mainImage]);
       setMainImage(product.mainImage);
     } else {
@@ -84,6 +92,10 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
       setCategoryName(categories[0]?.name || '');
       setRegularPrice('');
       setPromotionalPrice('');
+      setCostPrice('');
+      setAdSpend('');
+      setOfflinePrice('');
+      setProductType('physical');
       setStockQuantity(20);
       setStockStatus('in_stock');
       setShortDescription('');
@@ -212,6 +224,10 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
         status,
         isFeatured,
         isBestSeller,
+        productType,
+        costPrice: costPrice !== '' ? Number(costPrice) : 0,
+        adSpend: adSpend !== '' ? Number(adSpend) : 0,
+        offlinePrice: offlinePrice !== '' ? Number(offlinePrice) : undefined,
       });
 
       onClose();
@@ -295,64 +311,174 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
               </div>
             </div>
 
-            {/* Pricing & Stock */}
-            <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 p-4 bg-gray-50/70 rounded-2xl border border-gray-100">
-              <div>
-                <label className="block text-xs font-bold text-gray-700 mb-1">
-                  Regular Price (NGN) <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="number"
-                  required
-                  min="0"
-                  placeholder="38000"
-                  value={regularPrice}
-                  onChange={(e) => setRegularPrice(e.target.value ? Number(e.target.value) : '')}
-                  className="w-full text-sm bg-white border border-gray-200 rounded-xl px-3 py-2 focus:outline-none focus:border-[#F5A623]"
-                />
+            {/* Pricing, Cost, Ad Spend & Stock */}
+            <div className="space-y-4 p-5 bg-gray-50/80 rounded-2xl border border-gray-200">
+              <div className="flex items-center justify-between pb-2 border-b border-gray-200">
+                <span className="text-xs font-black text-gray-800 uppercase tracking-wider">
+                  Product Type, Pricing & Financial Unit Economics
+                </span>
+                <span className="text-[10px] text-gray-500 font-medium">
+                  Used for daily, weekly, monthly profit calculations
+                </span>
               </div>
 
-              <div>
-                <label className="block text-xs font-bold text-gray-700 mb-1">
-                  Promotional Price (NGN)
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  placeholder="29500"
-                  value={promotionalPrice}
-                  onChange={(e) => setPromotionalPrice(e.target.value ? Number(e.target.value) : '')}
-                  className="w-full text-sm bg-white border border-gray-200 rounded-xl px-3 py-2 focus:outline-none focus:border-[#F5A623]"
-                />
+              {/* Row 1: Product Type & Stock */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 mb-1">Product Type</label>
+                  <select
+                    value={productType}
+                    onChange={(e) => setProductType(e.target.value as any)}
+                    className="w-full text-xs font-bold bg-white border border-gray-200 rounded-xl px-3 py-2.5 focus:outline-none focus:border-[#F5A623]"
+                  >
+                    <option value="physical">Physical Product (Standard Goods)</option>
+                    <option value="bundle">Product Bundle / Pack</option>
+                    <option value="digital">Digital Download / Guide</option>
+                    <option value="service">Service / Warranty Add-on</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 mb-1">Stock Quantity</label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={stockQuantity}
+                    onChange={(e) => {
+                      const q = e.target.value ? Number(e.target.value) : 0;
+                      setStockQuantity(q);
+                      setStockStatus(q === 0 ? 'out_of_stock' : q <= 5 ? 'low_stock' : 'in_stock');
+                    }}
+                    className="w-full text-xs bg-white border border-gray-200 rounded-xl px-3 py-2.5 focus:outline-none focus:border-[#F5A623]"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 mb-1">Stock Status</label>
+                  <select
+                    value={stockStatus}
+                    onChange={(e) => setStockStatus(e.target.value as any)}
+                    className="w-full text-xs bg-white border border-gray-200 rounded-xl px-3 py-2.5 focus:outline-none focus:border-[#F5A623]"
+                  >
+                    <option value="in_stock">In Stock</option>
+                    <option value="low_stock">Low Stock (Restock soon)</option>
+                    <option value="out_of_stock">Out of Stock</option>
+                  </select>
+                </div>
               </div>
 
-              <div>
-                <label className="block text-xs font-bold text-gray-700 mb-1">Stock Quantity</label>
-                <input
-                  type="number"
-                  min="0"
-                  value={stockQuantity}
-                  onChange={(e) => {
-                    const q = e.target.value ? Number(e.target.value) : 0;
-                    setStockQuantity(q);
-                    setStockStatus(q === 0 ? 'out_of_stock' : q <= 5 ? 'low_stock' : 'in_stock');
-                  }}
-                  className="w-full text-sm bg-white border border-gray-200 rounded-xl px-3 py-2 focus:outline-none focus:border-[#F5A623]"
-                />
+              {/* Row 2: Prices, Cost & Ads Spend */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 pt-1">
+                <div>
+                  <label className="block text-[11px] font-bold text-gray-700 mb-1">
+                    Selling Price (Reg) <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="number"
+                    required
+                    min="0"
+                    placeholder="38000"
+                    value={regularPrice}
+                    onChange={(e) => setRegularPrice(e.target.value ? Number(e.target.value) : '')}
+                    className="w-full text-xs bg-white border border-gray-200 rounded-xl px-3 py-2 focus:outline-none focus:border-[#F5A623] font-bold text-gray-900"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-gray-700 mb-1">
+                    Promo Price (Online)
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    placeholder="29500"
+                    value={promotionalPrice}
+                    onChange={(e) => setPromotionalPrice(e.target.value ? Number(e.target.value) : '')}
+                    className="w-full text-xs bg-white border border-gray-200 rounded-xl px-3 py-2 focus:outline-none focus:border-[#F5A623] text-gray-900"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-gray-700 mb-1">
+                    Cost Price (COGS)
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    placeholder="12000"
+                    value={costPrice}
+                    onChange={(e) => setCostPrice(e.target.value ? Number(e.target.value) : '')}
+                    className="w-full text-xs bg-white border border-blue-200 rounded-xl px-3 py-2 focus:outline-none focus:border-blue-500 text-blue-900 font-semibold"
+                  />
+                  <span className="text-[9px] text-gray-400 block mt-0.5">Manufacturing / Buy</span>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-gray-700 mb-1">
+                    Ads Price / CPA
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    placeholder="2500"
+                    value={adSpend}
+                    onChange={(e) => setAdSpend(e.target.value ? Number(e.target.value) : '')}
+                    className="w-full text-xs bg-white border border-purple-200 rounded-xl px-3 py-2 focus:outline-none focus:border-purple-500 text-purple-900 font-semibold"
+                  />
+                  <span className="text-[9px] text-gray-400 block mt-0.5">Marketing cost/unit</span>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-gray-700 mb-1">
+                    Offline Store Price
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    placeholder="Leave empty for reg"
+                    value={offlinePrice}
+                    onChange={(e) => setOfflinePrice(e.target.value ? Number(e.target.value) : '')}
+                    className="w-full text-xs bg-white border border-gray-200 rounded-xl px-3 py-2 focus:outline-none focus:border-[#F5A623]"
+                  />
+                  <span className="text-[9px] text-gray-400 block mt-0.5">Walk-in counter price</span>
+                </div>
               </div>
 
-              <div>
-                <label className="block text-xs font-bold text-gray-700 mb-1">Stock Status</label>
-                <select
-                  value={stockStatus}
-                  onChange={(e) => setStockStatus(e.target.value as any)}
-                  className="w-full text-sm bg-white border border-gray-200 rounded-xl px-3 py-2 focus:outline-none focus:border-[#F5A623]"
-                >
-                  <option value="in_stock">In Stock</option>
-                  <option value="low_stock">Low Stock</option>
-                  <option value="out_of_stock">Out of Stock</option>
-                </select>
-              </div>
+              {/* Unit Economics Live Margin Calculator Card */}
+              {(() => {
+                const activePrice = Number(promotionalPrice || regularPrice || 0);
+                const cogs = Number(costPrice || 0);
+                const ads = Number(adSpend || 0);
+                const grossProfit = activePrice - cogs;
+                const netProfit = activePrice - cogs - ads;
+                const marginPercent = activePrice > 0 ? Math.round((netProfit / activePrice) * 100) : 0;
+
+                return (
+                  <div className="p-3 bg-white rounded-xl border border-gray-200 flex flex-wrap items-center justify-between gap-3 text-xs">
+                    <div className="flex items-center gap-4">
+                      <div>
+                        <span className="text-[10px] text-gray-400 font-bold uppercase block">Gross Margin</span>
+                        <span className="font-extrabold text-gray-900">₦{grossProfit.toLocaleString()}</span>
+                      </div>
+                      <div className="border-l border-gray-200 pl-4">
+                        <span className="text-[10px] text-gray-400 font-bold uppercase block">Net Profit / Unit</span>
+                        <span className={`font-black ${netProfit >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
+                          ₦{netProfit.toLocaleString()}
+                        </span>
+                      </div>
+                      <div className="border-l border-gray-200 pl-4">
+                        <span className="text-[10px] text-gray-400 font-bold uppercase block">Profit Margin %</span>
+                        <span className={`font-black ${marginPercent >= 20 ? 'text-emerald-600' : marginPercent > 0 ? 'text-amber-600' : 'text-red-500'}`}>
+                          {marginPercent}%
+                        </span>
+                      </div>
+                    </div>
+                    <span className="text-[10px] bg-amber-50 text-amber-900 px-2 py-1 rounded-md font-medium">
+                      Formula: Selling Price (₦{activePrice.toLocaleString()}) - COGS (₦{cogs.toLocaleString()}) - Ads (₦{ads.toLocaleString()})
+                    </span>
+                  </div>
+                );
+              })()}
             </div>
 
             {/* Category & Tags */}

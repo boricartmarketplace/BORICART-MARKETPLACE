@@ -225,7 +225,11 @@ export async function deleteCategory(id: string): Promise<void> {
 // =================== ORDERS SERVICES ===================
 
 export async function createOrder(
-  orderData: Omit<Order, 'id' | 'orderNumber' | 'createdAt' | 'updatedAt' | 'paymentMethod' | 'paymentStatus' | 'status'>
+  orderData: Omit<Order, 'id' | 'orderNumber' | 'createdAt' | 'updatedAt' | 'paymentMethod' | 'paymentStatus' | 'status'> & {
+    paymentMethod?: Order['paymentMethod'];
+    paymentStatus?: PaymentStatus;
+    status?: OrderStatus;
+  }
 ): Promise<Order> {
   const id = `order-${Date.now()}`;
   const orderNumber = generateOrderNumber();
@@ -244,9 +248,15 @@ export async function createOrder(
     subtotal: orderData.subtotal,
     deliveryFee: orderData.deliveryFee,
     totalAmount: orderData.totalAmount,
-    paymentMethod: 'cash_on_delivery',
-    paymentStatus: 'unpaid', // Cash on delivery is unpaid until delivery
-    status: 'pending',
+    paymentMethod: orderData.paymentMethod || 'cash_on_delivery',
+    paymentStatus: orderData.paymentStatus || 'unpaid',
+    status: orderData.status || 'pending',
+    channel: orderData.channel || 'online',
+    salesChannel: orderData.salesChannel || (orderData.channel === 'offline' ? 'offline_pos' : 'online_store'),
+    cashierName: orderData.cashierName,
+    costAmount: orderData.costAmount,
+    adSpendAmount: orderData.adSpendAmount,
+    netProfit: orderData.netProfit,
     notes: orderData.notes || '',
     createdAt: now,
     updatedAt: now,

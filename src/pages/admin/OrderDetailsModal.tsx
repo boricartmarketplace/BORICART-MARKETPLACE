@@ -218,6 +218,20 @@ export const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
             {/* Financial Summary */}
             <div className="space-y-2 text-xs text-gray-600 pt-2 border-t border-gray-100">
               <div className="flex justify-between">
+                <span>Sales Channel</span>
+                <span className="font-bold uppercase text-gray-800">
+                  {order.channel === 'offline' ? (
+                    <span className="bg-purple-100 text-purple-800 px-2 py-0.5 rounded-full text-[10px]">
+                      Walk-in / Offline POS {order.cashierName ? `(${order.cashierName})` : ''}
+                    </span>
+                  ) : (
+                    <span className="bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full text-[10px]">
+                      Online Storefront
+                    </span>
+                  )}
+                </span>
+              </div>
+              <div className="flex justify-between">
                 <span>Subtotal</span>
                 <span className="font-bold text-gray-800">{formatNaira(order.subtotal)}</span>
               </div>
@@ -228,11 +242,31 @@ export const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
                 </span>
               </div>
               <div className="flex justify-between text-sm pt-2 border-t border-gray-100 items-baseline">
-                <span className="font-black text-gray-900">Total Amount Due</span>
+                <span className="font-black text-gray-900">Total Collected Amount</span>
                 <span className="text-xl font-black text-[#F5A623]">
                   {formatNaira(order.totalAmount)}
                 </span>
               </div>
+
+              {/* Profit & Unit Economics breakdown if available */}
+              {order.netProfit !== undefined && (
+                <div className="mt-3 p-3 bg-emerald-50/70 border border-emerald-200 rounded-xl space-y-1">
+                  <div className="flex justify-between text-[11px] text-emerald-900">
+                    <span>Total Cost of Goods (COGS):</span>
+                    <span className="font-bold text-gray-800">{formatNaira(order.costAmount || 0)}</span>
+                  </div>
+                  {(order.adSpendAmount || 0) > 0 && (
+                    <div className="flex justify-between text-[11px] text-emerald-900">
+                      <span>Attributed Marketing Ad Spend:</span>
+                      <span className="font-bold text-gray-800">{formatNaira(order.adSpendAmount || 0)}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between text-xs font-black text-emerald-800 pt-1 border-t border-emerald-200/80">
+                    <span>Order Net Profit:</span>
+                    <span>{formatNaira(order.netProfit)}</span>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
