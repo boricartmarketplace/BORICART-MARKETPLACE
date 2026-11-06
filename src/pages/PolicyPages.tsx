@@ -1,18 +1,46 @@
 import React, { useState, useEffect } from 'react';
 import { Truck, ShieldCheck, RotateCcw, FileText, ArrowLeft } from 'lucide-react';
 import { WhatsAppButton } from '../components/common/WhatsAppButton';
+import { StoreSettings } from '../types';
+import { formatNaira } from '../firebase/services';
 
 interface PolicyPagesProps {
   initialPolicy?: 'delivery' | 'privacy' | 'terms';
   onNavigate: (page: string, params?: Record<string, any>) => void;
   whatsappNumber?: string;
+  settings?: StoreSettings;
 }
 
 export const PolicyPages: React.FC<PolicyPagesProps> = ({
   initialPolicy = 'delivery',
   onNavigate,
-  whatsappNumber = '+2348140008921',
+  whatsappNumber: propWhatsapp,
+  settings,
 }) => {
+  const whatsappNumber = settings?.whatsappNumber || propWhatsapp || '+2348140008921';
+  const content = settings?.pagesContent;
+  const deliveryFee = settings?.deliveryFee ?? 2500;
+  const freeThreshold = settings?.freeDeliveryThreshold ?? 15000;
+  const lagosInfo =
+    content?.deliveryLagosInfo ||
+    '24 to 48 hours delivery time. Direct riders dispatched from our Lagos central fulfillment hub.';
+  const nationwideInfo =
+    content?.deliveryNationwideInfo ||
+    '2 to 4 business days to Abuja, Port Harcourt, Ibadan, Kano, Enugu, and all 36 Nigerian states.';
+  const returnsText =
+    content?.returnsPolicyText ||
+    'If any product purchased from Boricart develops a manufacturer fault within our guarantee window, we will replace it free of charge.';
+  const warrantyDays = content?.warrantyPeriodDays || 7;
+  const warrantyText =
+    content?.warrantyText ||
+    `All Boricart solutions include our standard ${warrantyDays}-Day Factory Replacement Guarantee against any factory or electronic defects. If you encounter any issue, contact us directly on WhatsApp for an immediate swap.`;
+  const termsText =
+    content?.termsConditionsText ||
+    'Boricart operates as a single-brand, direct-to-consumer store. We do not host third-party vendors or multi-vendor sellers. All products displayed are curated, branded, and guaranteed directly by Boricart.';
+  const privacyText =
+    content?.privacyPolicyText ||
+    'We only collect information essential for fulfilling your orders: your full name, phone number, delivery address, state, city, and optional email address. All customer data is guarded securely.';
+
   const [activePolicy, setActivePolicy] = useState<'delivery' | 'privacy' | 'terms'>(initialPolicy);
 
   useEffect(() => {
@@ -102,15 +130,11 @@ export const PolicyPages: React.FC<PolicyPagesProps> = ({
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
                 <div className="bg-gray-50 p-4 rounded-2xl border border-gray-100">
                   <h4 className="font-bold text-gray-900 text-sm mb-1">Lagos State Express</h4>
-                  <p className="text-gray-600">
-                    24 to 48 hours delivery time. Direct riders dispatched from our Lagos central fulfillment hub.
-                  </p>
+                  <p className="text-gray-600">{lagosInfo}</p>
                 </div>
                 <div className="bg-gray-50 p-4 rounded-2xl border border-gray-100">
-                  <h4 className="font-bold text-gray-900 text-sm mb-1">Nationwide (All Other States & FCT)</h4>
-                  <p className="text-gray-600">
-                    2 to 4 business days to Abuja, Port Harcourt, Ibadan, Kano, Enugu, and all 36 Nigerian states.
-                  </p>
+                  <h4 className="font-bold text-gray-900 text-sm mb-1">Nationwide (All 36 States & FCT)</h4>
+                  <p className="text-gray-600">{nationwideInfo}</p>
                 </div>
               </div>
             </div>
@@ -118,18 +142,16 @@ export const PolicyPages: React.FC<PolicyPagesProps> = ({
             <div className="space-y-4">
               <h3 className="text-base font-bold text-[#333333]">3. Delivery Fees & Free Delivery</h3>
               <p>
-                Standard nationwide delivery is ₦2,500. Orders totaling ₦50,000 or above automatically qualify
-                for <strong>Free Nationwide Delivery</strong>.
+                Standard delivery fee is <strong>{formatNaira(deliveryFee)}</strong> across Nigeria. Orders totaling{' '}
+                <strong>{formatNaira(freeThreshold)}</strong> or above automatically qualify for{' '}
+                <strong>Free Delivery</strong>.
               </p>
             </div>
 
             <div className="space-y-4">
-              <h3 className="text-base font-bold text-[#333333]">4. 7-Day Hassle-Free Replacement Policy</h3>
-              <p>
-                If any product purchased from Boricart develops a manufacturer fault within 7 days of delivery,
-                we will replace it free of charge. Simply contact our support team on WhatsApp with a short video or photo
-                demonstrating the issue.
-              </p>
+              <h3 className="text-base font-bold text-[#333333]">4. {warrantyDays}-Day Factory Guarantee & Return Policy</h3>
+              <p>{returnsText}</p>
+              <p className="font-medium text-gray-800">{warrantyText}</p>
             </div>
 
             <div className="pt-4 border-t border-gray-100 flex items-center justify-between">
@@ -146,40 +168,11 @@ export const PolicyPages: React.FC<PolicyPagesProps> = ({
               <h1 className="text-2xl sm:text-3xl font-black text-[#333333] mt-1">
                 Terms and Conditions of Service
               </h1>
-              <p className="text-xs text-gray-400 mt-1">Last revised: November 2026</p>
+              <p className="text-xs text-gray-400 mt-1">Managed from Boricart Administration</p>
             </div>
 
-            <div className="space-y-3">
-              <h3 className="text-base font-bold text-[#333333]">1. Single-Brand Operation</h3>
-              <p>
-                Boricart operates as a single-brand, direct-to-consumer store. We do not host third-party vendors
-                or multi-vendor sellers. All products displayed are curated, branded, and guaranteed directly by Boricart.
-              </p>
-            </div>
-
-            <div className="space-y-3">
-              <h3 className="text-base font-bold text-[#333333]">2. Order Placement & Cancellation</h3>
-              <p>
-                By placing an order using Cash on Delivery, you enter into a good-faith agreement to receive and pay for the items
-                when our dispatch rider arrives at your specified address. If you need to reschedule or cancel an order, please do so
-                promptly via our WhatsApp customer line before dispatch.
-              </p>
-            </div>
-
-            <div className="space-y-3">
-              <h3 className="text-base font-bold text-[#333333]">3. Pricing & Currency</h3>
-              <p>
-                All prices are explicitly listed in Nigerian Naira (NGN / ₦) inclusive of all applicable duties and taxes. We reserve
-                the right to update prices or promotional discounts at any time without prior notice.
-              </p>
-            </div>
-
-            <div className="space-y-3">
-              <h3 className="text-base font-bold text-[#333333]">4. Intellectual Property</h3>
-              <p>
-                All trademarks, logos, product names, photography, and text content belong exclusively to Boricart.
-                Unauthorized duplication or re-hosting of brand assets is strictly prohibited.
-              </p>
+            <div className="space-y-4 text-gray-600 whitespace-pre-line leading-relaxed">
+              <p>{termsText}</p>
             </div>
           </div>
         )}
@@ -191,32 +184,11 @@ export const PolicyPages: React.FC<PolicyPagesProps> = ({
               <h1 className="text-2xl sm:text-3xl font-black text-[#333333] mt-1">
                 Boricart Privacy Policy
               </h1>
-              <p className="text-xs text-gray-400 mt-1">Last revised: November 2026</p>
+              <p className="text-xs text-gray-400 mt-1">Managed from Boricart Administration</p>
             </div>
 
-            <div className="space-y-3">
-              <h3 className="text-base font-bold text-[#333333]">1. Information We Collect</h3>
-              <p>
-                We only collect information essential for fulfilling your orders: your full name, phone number,
-                delivery address, state, city, and optional email address. We do NOT collect or store credit card numbers
-                or bank PINs.
-              </p>
-            </div>
-
-            <div className="space-y-3">
-              <h3 className="text-base font-bold text-[#333333]">2. How We Use Your Data</h3>
-              <p>
-                Your phone number and address are used strictly by our logistics department and authorized dispatch couriers
-                to deliver your orders and contact you via phone or WhatsApp.
-              </p>
-            </div>
-
-            <div className="space-y-3">
-              <h3 className="text-base font-bold text-[#333333]">3. Data Security</h3>
-              <p>
-                All customer orders and inquiries are stored in secure Google Cloud Firestore databases adhering to zero-trust
-                attribute-based security rules. We never sell, rent, or share your private data with advertising brokers.
-              </p>
+            <div className="space-y-4 text-gray-600 whitespace-pre-line leading-relaxed">
+              <p>{privacyText}</p>
             </div>
           </div>
         )}

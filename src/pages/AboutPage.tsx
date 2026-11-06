@@ -1,16 +1,43 @@
 import React from 'react';
 import { ShieldCheck, Sparkles, CheckCircle2, Truck, Users, Award, ArrowRight } from 'lucide-react';
 import { WhatsAppButton } from '../components/common/WhatsAppButton';
+import { StoreSettings } from '../types';
 
 interface AboutPageProps {
   onNavigate: (page: string, params?: Record<string, any>) => void;
   whatsappNumber?: string;
+  settings?: StoreSettings;
 }
 
 export const AboutPage: React.FC<AboutPageProps> = ({
   onNavigate,
   whatsappNumber = '+2348140008921',
+  settings,
 }) => {
+  const content = settings?.pagesContent;
+  const title = content?.aboutTitle || 'Everyday Solutions. Better Living.';
+  const subtitle =
+    content?.aboutSubtitle ||
+    'Boricart is an authentic Nigerian consumer brand dedicated to solving everyday domestic frustrations through smart, reliable, and beautifully engineered essentials.';
+  const story =
+    content?.aboutStory ||
+    'For years, Nigerian shoppers navigating online marketplaces had to gamble on quality: unverified third-party vendors, fake reviews, cheap imitations that break down after two weeks, and the constant fear of losing hard-earned money to advance online transfers. BORICART was built to change that narrative completely.';
+  const mission =
+    content?.aboutMission ||
+    'We operate as a single-brand, direct-to-consumer company. We curate, test, and brand our own products—from cordless power cleaning tools and heavy-duty 65W fast-charging banks to hygienic motion-sensor smart bins. Every product in our catalog has been rigorously inspected to withstand the practical demands of Nigerian homes and lifestyles.';
+  const promise =
+    content?.aboutPromise ||
+    'We never compromise on utility. If a product does not genuinely save you time, effort, or money, it does not belong in the Boricart catalog.';
+  const values = content?.aboutValues || [
+    '100% Guaranteed Authenticity',
+    'Nationwide Cash on Delivery',
+    'Rigorous Real-World Testing',
+    '7-Day No-Hassle Swap Guarantee',
+  ];
+  const aboutImage =
+    content?.aboutImage ||
+    'https://images.unsplash.com/photo-1556740758-90de374c12ad?auto=format&fit=crop&w=800&q=80';
+
   return (
     <div className="space-y-16 sm:space-y-24 pb-16">
       {/* 1. Hero */}
@@ -20,11 +47,10 @@ export const AboutPage: React.FC<AboutPageProps> = ({
             The Boricart Story
           </span>
           <h1 className="text-3xl sm:text-5xl font-black text-[#333333] tracking-tight">
-            Everyday Solutions. Better Living.
+            {title}
           </h1>
           <p className="text-base sm:text-lg text-gray-600 leading-relaxed max-w-2xl mx-auto">
-            Boricart is an authentic Nigerian consumer brand dedicated to solving everyday domestic
-            frustrations through smart, reliable, and beautifully engineered essentials.
+            {subtitle}
           </p>
         </div>
       </section>
@@ -39,33 +65,24 @@ export const AboutPage: React.FC<AboutPageProps> = ({
             <h2 className="text-2xl sm:text-3xl font-black text-[#333333] leading-snug">
               Eliminating the Guesswork in Nigerian E-Commerce
             </h2>
-            <p className="text-sm text-gray-600 leading-relaxed">
-              For years, Nigerian shoppers navigating online marketplaces had to gamble on quality:
-              unverified third-party vendors, fake reviews, cheap imitations that break down after two
-              weeks, and the constant fear of losing hard-earned money to advance online transfers.
-            </p>
-            <p className="text-sm text-gray-600 leading-relaxed">
-              <strong>BORICART was built to change that narrative completely.</strong>
-            </p>
-            <p className="text-sm text-gray-600 leading-relaxed">
-              We operate as a single-brand, direct-to-consumer company. We curate, test, and brand our
-              own products—from cordless power cleaning tools and heavy-duty 65W fast-charging banks to
-              hygienic motion-sensor smart bins. Every product in our catalog has been rigorously
-              inspected to withstand the practical demands of Nigerian homes and lifestyles.
-            </p>
+            <div className="text-sm text-gray-600 leading-relaxed space-y-4">
+              <p>{story}</p>
+              <p className="font-bold text-[#333333]">{promise}</p>
+              <p>{mission}</p>
+            </div>
           </div>
 
           <div className="relative">
             <div className="aspect-4/3 rounded-3xl overflow-hidden shadow-xl border border-gray-100">
               <img
-                src="https://images.unsplash.com/photo-1556740758-90de374c12ad?auto=format&fit=crop&w=800&q=80"
+                src={aboutImage}
                 alt="Boricart team commitment to quality"
                 className="w-full h-full object-cover"
               />
             </div>
             <div className="absolute -bottom-6 -left-6 bg-white p-5 rounded-2xl shadow-lg border border-gray-100 max-w-xs hidden sm:block">
               <p className="text-xs font-bold text-[#333333]">
-                "Better living starts with tools that actually work when you need them most."
+                "{promise}"
               </p>
               <p className="text-[10px] text-gray-400 mt-1 uppercase font-semibold">
                 — Boricart Brand Promise

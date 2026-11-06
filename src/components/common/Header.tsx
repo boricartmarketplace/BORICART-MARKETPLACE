@@ -27,6 +27,7 @@ interface HeaderProps {
   currentRoute: string;
   onNavigate: (page: string, params?: Record<string, any>) => void;
   whatsappNumber?: string;
+  settings?: StoreSettings;
   onOpenSearchModal?: () => void;
 }
 
@@ -36,6 +37,7 @@ export const Header: React.FC<HeaderProps> = ({
   currentRoute,
   onNavigate,
   whatsappNumber = '+2348140008921',
+  settings,
   onOpenSearchModal,
 }) => {
   const { totalItems, subtotal, setIsCartOpen } = useCart();
@@ -50,12 +52,14 @@ export const Header: React.FC<HeaderProps> = ({
   const searchRef = useRef<HTMLDivElement>(null);
   const accountRef = useRef<HTMLDivElement>(null);
 
-  // Rotating Announcement Bar Messages
-  const announcements = [
-    'Everyday Solutions. Better Living.',
-    'Shop Smart. Save More.',
-    'Convenient Cash on Delivery Across Nigeria.',
-  ];
+  // Rotating Announcement Bar Messages from backend settings
+  const announcements = settings?.announcementMessages && settings.announcementMessages.length > 0
+    ? settings.announcementMessages
+    : [
+        'Everyday Solutions. Better Living.',
+        'Shop Smart. Save More.',
+        'Convenient Cash on Delivery Across Nigeria.',
+      ];
   const [currentAnnouncementIdx, setCurrentAnnouncementIdx] = useState(0);
 
   useEffect(() => {
@@ -109,7 +113,7 @@ export const Header: React.FC<HeaderProps> = ({
             <div className="flex items-center gap-1.5 text-gray-200">
               <Truck className="w-3.5 h-3.5 text-[#F5A623]" />
               <span className="font-medium whitespace-nowrap">
-                Free Delivery on Orders Above ₦15,000
+                Free Delivery on Orders Above {formatNaira(settings?.freeDeliveryThreshold ?? 15000)}
               </span>
             </div>
             <div className="hidden md:flex items-center gap-1.5 text-gray-200">
@@ -182,15 +186,15 @@ export const Header: React.FC<HeaderProps> = ({
             </button>
           </div>
 
-          {/* Official BORICART Logo */}
+          {/* Official BORICART Logo (Prominent & Clear) */}
           <div
             onClick={() => onNavigate('home')}
-            className="flex items-center gap-2 cursor-pointer select-none shrink-0"
+            className="flex items-center gap-2 cursor-pointer select-none shrink-0 py-1"
           >
             <img
-              src="/assets/aistudio/image_af74bfee.png"
+              src="/assets/aistudio/boricart_logo.png"
               alt="BORICART — Everyday Solutions. Better Living."
-              className="h-10 sm:h-12 w-auto object-contain hover:opacity-95 transition-opacity"
+              className="h-11 sm:h-13 md:h-14 w-auto object-contain hover:opacity-95 transition-opacity"
             />
           </div>
 
@@ -485,7 +489,7 @@ export const Header: React.FC<HeaderProps> = ({
                   }}
                 >
                   <img
-                    src="/assets/aistudio/image_af74bfee.png"
+                    src="/assets/aistudio/boricart_logo.png"
                     alt="BORICART"
                     className="h-9 w-auto object-contain"
                   />

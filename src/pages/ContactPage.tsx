@@ -1,16 +1,27 @@
 import React, { useState } from 'react';
 import { Mail, Phone, MapPin, Clock, MessageCircle, Send, CheckCircle2, ChevronDown, ChevronUp } from 'lucide-react';
 import { WhatsAppButton } from '../components/common/WhatsAppButton';
+import { StoreSettings } from '../types';
 
 interface ContactPageProps {
   whatsappNumber?: string;
   supportEmail?: string;
+  settings?: StoreSettings;
 }
 
 export const ContactPage: React.FC<ContactPageProps> = ({
-  whatsappNumber = '+2348140008921',
-  supportEmail = 'support@boricart.com',
+  whatsappNumber: propWhatsapp,
+  supportEmail: propEmail,
+  settings,
 }) => {
+  const whatsappNumber = settings?.whatsappNumber || propWhatsapp || '+2348140008921';
+  const supportEmail = settings?.supportEmail || propEmail || 'support@boricart.com';
+  const supportPhone = settings?.supportPhone || '+234 814 000 8921';
+  const officeAddress = settings?.officeAddress || settings?.pagesContent?.officeAddress || '14 Admiralty Way, Lekki Phase 1, Lagos, Nigeria';
+  const businessHours = settings?.pagesContent?.businessHours || 'Monday – Saturday: 8:00 AM – 7:00 PM | Sunday: 10:00 AM – 4:00 PM';
+  const heading = settings?.pagesContent?.contactHeading || 'We Are Here to Assist You';
+  const subheading = settings?.pagesContent?.contactSubheading || 'Have a question about a product, your delivery, or bulk orders? Connect with our dedicated team in Lagos.';
+
   const [formData, setFormData] = useState({
     name: '',
     phone: '',
@@ -27,7 +38,9 @@ export const ContactPage: React.FC<ContactPageProps> = ({
     setSubmitted(true);
   };
 
-  const faqs = [
+  const faqs = settings?.pagesContent?.contactFaqs && settings.pagesContent.contactFaqs.length > 0
+    ? settings.pagesContent.contactFaqs
+    : [
     {
       q: 'How does Cash on Delivery (COD) work with Boricart?',
       a: 'You simply place your order on our website without making any upfront payment. Once our dispatch rider brings your package to your doorstep, you open and inspect your items, and only pay using Cash or POS / Bank Transfer.',
@@ -54,11 +67,10 @@ export const ContactPage: React.FC<ContactPageProps> = ({
           Get in Touch
         </span>
         <h1 className="text-3xl sm:text-4xl font-black text-[#333333]">
-          We Are Here to Assist You
+          {heading}
         </h1>
         <p className="text-sm text-gray-500">
-          Have a question about a product, your delivery, or bulk orders? Connect with our dedicated
-          Nigerian customer team.
+          {subheading}
         </p>
       </div>
 
@@ -94,7 +106,7 @@ export const ContactPage: React.FC<ContactPageProps> = ({
               <div>
                 <h4 className="text-sm font-bold text-[#333333]">Headquarters</h4>
                 <p className="text-xs text-gray-500 mt-0.5">
-                  Lekki Phase 1, Victoria Island Corridor, Lagos State, Nigeria
+                  {officeAddress}
                 </p>
               </div>
             </div>
@@ -105,7 +117,7 @@ export const ContactPage: React.FC<ContactPageProps> = ({
               </div>
               <div>
                 <h4 className="text-sm font-bold text-[#333333]">Customer Care Line</h4>
-                <p className="text-xs text-gray-500 mt-0.5">{whatsappNumber}</p>
+                <p className="text-xs text-gray-500 mt-0.5">{supportPhone || whatsappNumber}</p>
                 <p className="text-[11px] text-gray-400">Available on phone calls & WhatsApp</p>
               </div>
             </div>
@@ -126,8 +138,7 @@ export const ContactPage: React.FC<ContactPageProps> = ({
               </div>
               <div>
                 <h4 className="text-sm font-bold text-[#333333]">Business Hours</h4>
-                <p className="text-xs text-gray-500 mt-0.5">Monday – Saturday: 8:00 AM – 7:00 PM</p>
-                <p className="text-xs text-gray-500">Sunday: WhatsApp Dispatch Inquiries Only</p>
+                <p className="text-xs text-gray-500 mt-0.5">{businessHours}</p>
               </div>
             </div>
           </div>

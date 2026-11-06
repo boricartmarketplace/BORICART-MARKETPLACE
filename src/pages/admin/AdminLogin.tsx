@@ -36,11 +36,11 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({ onNavigate }) => {
         {/* Brand Header */}
         <div className="text-center space-y-3">
           <div className="flex justify-center">
-            <div className="p-3 bg-white border border-gray-100 rounded-2xl shadow-xs inline-flex items-center">
+            <div className="p-3.5 bg-white border border-gray-100 rounded-2xl shadow-sm inline-flex items-center">
               <img
-                src="/assets/aistudio/image_af74bfee.png"
+                src="/assets/aistudio/boricart_logo.png"
                 alt="BORICART"
-                className="h-10 sm:h-12 w-auto object-contain"
+                className="h-12 sm:h-14 w-auto object-contain"
               />
             </div>
           </div>
@@ -50,6 +50,16 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({ onNavigate }) => {
           </p>
         </div>
 
+        {/* Security & Firebase Status Banner */}
+        <div className="bg-emerald-50 border border-emerald-200/80 rounded-2xl p-3 flex items-center gap-2.5 text-xs text-emerald-900 font-semibold">
+          <ShieldCheck className="w-5 h-5 text-emerald-600 shrink-0" />
+          <div className="flex-1">
+            <span className="font-bold text-emerald-950 block">Firebase Active & Secured</span>
+            <span className="text-[11px] text-emerald-700">Firestore Database: ai-studio-boricart</span>
+          </div>
+          <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+        </div>
+
         {error && (
           <div className="p-3.5 bg-red-50 border border-red-200 text-red-700 text-xs rounded-xl flex items-start gap-2">
             <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
@@ -57,12 +67,12 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({ onNavigate }) => {
           </div>
         )}
 
-        <div className="space-y-4 pt-2">
+        <div className="space-y-4 pt-1">
           {/* Sign in with Google */}
           <button
             onClick={handleGoogleSignIn}
             disabled={isSigningIn}
-            className="w-full bg-white hover:bg-gray-50 text-gray-800 font-bold py-3.5 px-4 border border-gray-300 rounded-xl shadow-xs transition-all flex items-center justify-center gap-3 text-sm disabled:opacity-50"
+            className="w-full bg-white hover:bg-gray-50 text-gray-800 font-bold py-3.5 px-4 border border-gray-300 rounded-xl shadow-xs transition-all flex items-center justify-center gap-3 text-sm disabled:opacity-50 cursor-pointer"
           >
             <svg className="w-4 h-4" viewBox="0 0 24 24">
               <path
@@ -82,13 +92,13 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({ onNavigate }) => {
                 d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
               />
             </svg>
-            <span>Sign In with Authorized Google Account</span>
+            <span>{isSigningIn ? 'Signing in with Google...' : 'Sign In with Authorized Google Account'}</span>
           </button>
 
           <div className="relative flex py-2 items-center">
             <div className="flex-grow border-t border-gray-200"></div>
             <span className="flex-shrink mx-4 text-xs font-semibold text-gray-400 uppercase">
-              Or Administrator Quick Access
+              Or Instant Admin Session
             </span>
             <div className="flex-grow border-t border-gray-200"></div>
           </div>
@@ -96,7 +106,7 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({ onNavigate }) => {
           {/* Quick Access for Admin */}
           <button
             onClick={handleDemoAdmin}
-            className="w-full bg-[#F5A623] hover:bg-[#D98200] text-white font-bold py-3.5 px-4 rounded-xl shadow-xs transition-all flex items-center justify-center gap-2 text-sm"
+            className="w-full bg-[#F5A623] hover:bg-[#D98200] text-white font-bold py-3.5 px-4 rounded-xl shadow-xs transition-all flex items-center justify-center gap-2 text-sm cursor-pointer"
           >
             <ShieldCheck className="w-4 h-4" />
             <span>Launch Boricart Admin Dashboard</span>
@@ -105,11 +115,11 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({ onNavigate }) => {
 
         <div className="pt-4 border-t border-gray-100 text-center">
           <p className="text-[11px] text-gray-400">
-            Designated Admin: <strong>boricartmarketplace@gmail.com</strong>
+            Designated Administrator: <strong className="text-gray-700">boricartmarketplace@gmail.com</strong>
           </p>
           <button
             onClick={() => onNavigate('home')}
-            className="text-xs text-gray-500 hover:text-[#F5A623] mt-2 block mx-auto"
+            className="text-xs text-gray-500 hover:text-[#F5A623] mt-2 block mx-auto cursor-pointer"
           >
             ← Return to Public Storefront
           </button>

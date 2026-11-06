@@ -482,21 +482,109 @@ export const INITIAL_PRODUCTS: Product[] = [
   },
 ];
 
+export const DEFAULT_PAGES_CONTENT = {
+  aboutTitle: 'Everyday Solutions. Better Living.',
+  aboutSubtitle: 'Boricart is an authentic Nigerian consumer brand dedicated to solving everyday domestic frustrations through smart, reliable, and beautifully engineered essentials.',
+  aboutStory: 'For years, Nigerian shoppers navigating online marketplaces had to gamble on quality: unverified third-party vendors, fake reviews, cheap imitations that break down after two weeks, and the constant fear of losing hard-earned money to advance online transfers. BORICART was built to change that narrative completely.',
+  aboutMission: 'We operate as a single-brand, direct-to-consumer company. We curate, test, and brand our own products—from cordless power cleaning tools and heavy-duty 65W fast-charging banks to hygienic motion-sensor smart bins. Every product in our catalog has been rigorously inspected to withstand the practical demands of Nigerian homes and lifestyles.',
+  aboutPromise: 'We never compromise on utility. If a product does not genuinely save you time, effort, or money, it does not belong in the Boricart catalog.',
+  aboutValues: [
+    '100% Guaranteed Authenticity',
+    'Nationwide Cash on Delivery',
+    'Rigorous Real-World Testing',
+    '7-Day No-Hassle Swap Guarantee'
+  ],
+  aboutImage: 'https://images.unsplash.com/photo-1556740758-90de374c12ad?auto=format&fit=crop&w=1200&q=80',
+
+  contactHeading: 'We Are Here to Assist You',
+  contactSubheading: 'Have a question about a product, your delivery, or need order support? Connect with our dedicated team in Lagos.',
+  officeAddress: '14 Admiralty Way, Lekki Phase 1, Lagos, Nigeria',
+  businessHours: 'Monday – Saturday: 8:00 AM – 7:00 PM | Sunday: 10:00 AM – 4:00 PM',
+  contactFaqs: [
+    {
+      q: 'How does Cash on Delivery (COD) work with Boricart?',
+      a: 'You simply place your order on our website without making any upfront payment. Once our dispatch rider brings your package to your doorstep, you open and inspect your items, and only pay using Cash or POS / Bank Transfer.',
+    },
+    {
+      q: 'How fast is delivery to Lagos and other Nigerian states?',
+      a: 'Deliveries within Lagos are typically completed within 24 to 48 hours. Deliveries to Abuja, Port Harcourt, Ibadan, and other nationwide locations take 2 to 4 business days via express interstate couriers.',
+    },
+    {
+      q: 'Are Boricart products covered by a warranty?',
+      a: 'Yes! All Boricart products include our standard 7-day replacement guarantee against any factory or electronic defects. If you encounter any issue, contact us directly on WhatsApp for an immediate swap.',
+    },
+    {
+      q: 'Can I place my order directly over WhatsApp?',
+      a: 'Absolutely! If you prefer chatting with a real representative, click our WhatsApp button. Our team will take your delivery address and dispatch your order immediately.',
+    },
+  ],
+
+  deliveryHeadline: 'Nationwide Pay on Delivery Across Nigeria',
+  deliveryLagosInfo: 'Delivered within 24 to 48 hours via Boricart dispatch riders in Lagos.',
+  deliveryNationwideInfo: 'Delivered within 2 to 4 business days to Abuja, Port Harcourt, Ibadan, Kano, and all 36 states.',
+  returnsPolicyText: 'Inspect your order upon doorstep arrival. If any product arrives damaged or develops a manufacturer defect within 7 days, we arrange a free doorstep pickup and immediate replacement.',
+  warrantyPeriodDays: 7,
+  warrantyText: 'All Boricart electrical and mechanical solutions are backed by our 7-Day Factory Replacement Guarantee. Defective units are swapped with zero stress.',
+
+  termsConditionsText: 'Boricart operates as a single-brand, direct-to-consumer store. We do not host third-party vendors. All products displayed are curated, branded, and guaranteed directly by Boricart. Customers retain full right of inspection upon delivery prior to completing payment.',
+  privacyPolicyText: 'Boricart respects your privacy. We collect your delivery name, address, and phone number exclusively for order fulfillment and dispatch coordination. Your personal data is never sold, rented, or shared with third parties.',
+};
+
 export const DEFAULT_SETTINGS: StoreSettings = {
   whatsappNumber: '+2348140008921',
   storeName: 'BORICART',
   supportEmail: 'support@boricart.com',
   supportPhone: '+234 814 000 8921',
+  officeAddress: '14 Admiralty Way, Lekki Phase 1, Lagos, Nigeria',
   deliveryFee: 2500,
-  freeDeliveryThreshold: 15000, // Matches top bar in reference screenshot: "Free Delivery on Orders Above ₦15,000"
+  freeDeliveryThreshold: 15000,
+  lagosDeliveryFee: 2000,
+  nationwideDeliveryFee: 3500,
+  deliveryEstimatedDays: '24-48 hours within Lagos; 2-4 days nationwide',
+  announcementMessages: [
+    'Free Delivery on Orders Above ₦15,000',
+    'Nationwide Cash on Delivery • Inspect Before Payment',
+    '24/7 Dedicated Support on WhatsApp'
+  ],
   heroImage: '/assets/aistudio/image_11326346.png',
   heroTagline: 'Welcome to Boricart',
   heroHeadline: 'Everyday Solutions.',
   heroSubhead: 'Better Living.',
   heroDescription: 'Discover practical products designed to make everyday life easier, smarter and more convenient.',
   heroButtonText: 'Shop Now',
+  pagesContent: DEFAULT_PAGES_CONTENT,
   updatedAt: new Date().toISOString(),
 };
+
+export const INITIAL_STAFF: AdminUser[] = [
+  {
+    id: 'admin-overall-1',
+    name: 'Boricart Overall Admin',
+    email: 'boricartmarketplace@gmail.com',
+    role: 'overall_admin',
+    status: 'active',
+    phone: '+2348140008921',
+    createdAt: new Date().toISOString(),
+  },
+  {
+    id: 'admin-storekeeper-1',
+    name: 'Chioma Okonjo',
+    email: 'storekeeper@boricart.com',
+    role: 'store_keeper',
+    status: 'active',
+    phone: '+2348140008922',
+    createdAt: new Date().toISOString(),
+  },
+  {
+    id: 'admin-dispatcher-1',
+    name: 'Emeka Adebayo',
+    email: 'dispatcher@boricart.com',
+    role: 'order_dispatcher',
+    status: 'active',
+    phone: '+2348140008923',
+    createdAt: new Date().toISOString(),
+  },
+];
 
 export const NIGERIAN_STATES = [
   'Abia', 'Adamawa', 'Akwa Ibom', 'Anambra', 'Bauchi', 'Bayelsa', 'Benue', 'Borno',
@@ -505,3 +593,4 @@ export const NIGERIAN_STATES = [
   'Nasarawa', 'Niger', 'Ogun', 'Ondo', 'Osun', 'Oyo', 'Plateau', 'Rivers', 'Sokoto',
   'Taraba', 'Yobe', 'Zamfara'
 ];
+

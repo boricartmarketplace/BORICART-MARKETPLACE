@@ -23,11 +23,11 @@ export const Footer: React.FC<FooterProps> = ({
         {/* Brand info */}
         <div className="lg:col-span-2 space-y-4">
           <div className="flex items-center gap-3 cursor-pointer" onClick={() => onNavigate('home')}>
-            <div className="bg-white px-3.5 py-1.5 rounded-2xl shadow-sm inline-flex items-center">
+            <div className="bg-white px-4 py-2 rounded-2xl shadow-sm inline-flex items-center">
               <img
-                src="/assets/aistudio/image_af74bfee.png"
+                src="/assets/aistudio/boricart_logo.png"
                 alt="BORICART — Everyday Solutions. Better Living."
-                className="h-9 w-auto object-contain"
+                className="h-10 sm:h-11 w-auto object-contain"
               />
             </div>
           </div>

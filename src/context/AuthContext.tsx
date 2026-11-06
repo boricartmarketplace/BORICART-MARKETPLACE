@@ -6,21 +6,27 @@ import {
   GoogleAuthProvider,
   signOut,
 } from 'firebase/auth';
-import { auth } from '../firebase/config';
+import { auth, db } from '../firebase/config';
+import { collection, getDocs, query, where } from 'firebase/firestore';
+import { AdminRole, AdminUser } from '../types';
+import { INITIAL_STAFF } from '../data/initialCatalog';
 
 interface AuthContextType {
   user: User | null;
   isAdmin: boolean;
+  adminRole: AdminRole;
+  staffUser: AdminUser | null;
   isLoading: boolean;
   loginWithGoogle: () => Promise<void>;
-  loginDemoAdmin: () => void;
+  loginDemoAdmin: (role?: AdminRole) => void;
+  switchRole: (role: AdminRole) => void;
   logout: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Master admin email provided in user session
-const AUTHORIZED_ADMIN_EMAILS = [
+// Master super admin emails
+const SUPER_ADMIN_EMAILS = [
   'boricartmarketplace@gmail.com',
   'admin@boricart.com',
 ];
@@ -28,17 +34,49 @@ const AUTHORIZED_ADMIN_EMAILS = [
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [isAdmin, setIsAdmin] = useState<boolean>(() => {
-    // Check if session admin was previously saved in localStorage
     return localStorage.getItem('boricart_admin_session') === 'true';
   });
+  const [adminRole, setAdminRole] = useState<AdminRole>(() => {
+    const saved = localStorage.getItem('boricart_admin_role') as AdminRole;
+    return saved || 'overall_admin';
+  });
+  const [staffUser, setStaffUser] = useState<AdminUser | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
+  // Lookup role from Firestore when user authenticates
+  const checkStaffRole = async (email: string) => {
+    try {
+      const q = query(collection(db, 'admins'), where('email', '==', email.toLowerCase()));
+      const snap = await getDocs(q);
+      if (!snap.empty) {
+        const data = snap.docs[0].data() as AdminUser;
+        if (data.status !== 'suspended') {
+          setStaffUser({ id: snap.docs[0].id, ...data });
+          setAdminRole(data.role || 'overall_admin');
+          localStorage.setItem('boricart_admin_role', data.role || 'overall_admin');
+          return true;
+        }
+      }
+    } catch (e) {
+      console.warn('Could not query staff role from Firestore:', e);
+    }
+    // Fallback if super admin
+    if (SUPER_ADMIN_EMAILS.includes(email.toLowerCase())) {
+      setAdminRole('overall_admin');
+      localStorage.setItem('boricart_admin_role', 'overall_admin');
+      return true;
+    }
+    return false;
+  };
+
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       setUser(firebaseUser);
-      if (firebaseUser) {
+      if (firebaseUser?.email) {
+        const isStaff = await checkStaffRole(firebaseUser.email);
         const isAuthAdmin =
-          Boolean(firebaseUser.email && AUTHORIZED_ADMIN_EMAILS.includes(firebaseUser.email.toLowerCase())) ||
+          isStaff ||
+          SUPER_ADMIN_EMAILS.includes(firebaseUser.email.toLowerCase()) ||
           localStorage.getItem('boricart_admin_session') === 'true';
         setIsAdmin(isAuthAdmin);
       } else {
@@ -56,12 +94,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       const provider = new GoogleAuthProvider();
       const result = await signInWithPopup(auth, provider);
-      const isAuthAdmin =
-        Boolean(result.user.email && AUTHORIZED_ADMIN_EMAILS.includes(result.user.email.toLowerCase()));
-      if (isAuthAdmin) {
-        localStorage.setItem('boricart_admin_session', 'true');
-        setIsAdmin(true);
+      if (result.user.email) {
+        await checkStaffRole(result.user.email);
       }
+      localStorage.setItem('boricart_admin_session', 'true');
+      setIsAdmin(true);
     } catch (error) {
       console.error('Google sign-in error:', error);
       throw error;
@@ -70,15 +107,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const loginDemoAdmin = () => {
+  const loginDemoAdmin = (role: AdminRole = 'overall_admin') => {
     localStorage.setItem('boricart_admin_session', 'true');
+    localStorage.setItem('boricart_admin_role', role);
+    setAdminRole(role);
+    const mockStaff = INITIAL_STAFF.find((s) => s.role === role) || INITIAL_STAFF[0];
+    setStaffUser(mockStaff);
     setIsAdmin(true);
+  };
+
+  const switchRole = (role: AdminRole) => {
+    setAdminRole(role);
+    localStorage.setItem('boricart_admin_role', role);
+    const mockStaff = INITIAL_STAFF.find((s) => s.role === role) || INITIAL_STAFF[0];
+    setStaffUser(mockStaff);
   };
 
   const logout = async () => {
     try {
       localStorage.removeItem('boricart_admin_session');
+      localStorage.removeItem('boricart_admin_role');
       setIsAdmin(false);
+      setStaffUser(null);
       await signOut(auth);
     } catch (error) {
       console.error('Sign-out error:', error);
@@ -90,9 +140,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       value={{
         user,
         isAdmin,
+        adminRole,
+        staffUser,
         isLoading,
         loginWithGoogle,
         loginDemoAdmin,
+        switchRole,
         logout,
       }}
     >

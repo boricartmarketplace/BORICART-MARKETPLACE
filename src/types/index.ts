@@ -101,19 +101,73 @@ export interface CartItem {
   quantity: number;
 }
 
+export type AdminRole = 'overall_admin' | 'store_keeper' | 'order_dispatcher';
+
+export interface AdminUser {
+  id: string;
+  name: string;
+  email: string;
+  role: AdminRole;
+  status: 'active' | 'suspended';
+  phone?: string;
+  createdAt: string;
+  lastActive?: string;
+}
+
+export interface SiteFaq {
+  q: string;
+  a: string;
+}
+
+export interface SitePagesContent {
+  // About Page
+  aboutTitle: string;
+  aboutSubtitle: string;
+  aboutStory: string;
+  aboutMission: string;
+  aboutPromise: string;
+  aboutValues: string[];
+  aboutImage?: string;
+
+  // Contact Page
+  contactHeading: string;
+  contactSubheading: string;
+  officeAddress: string;
+  businessHours: string;
+  contactFaqs: SiteFaq[];
+
+  // Delivery & Returns
+  deliveryHeadline: string;
+  deliveryLagosInfo: string;
+  deliveryNationwideInfo: string;
+  returnsPolicyText: string;
+  warrantyPeriodDays: number;
+  warrantyText: string;
+
+  // Legal Policies
+  termsConditionsText: string;
+  privacyPolicyText: string;
+}
+
 export interface StoreSettings {
   whatsappNumber: string;
   storeName: string;
   supportEmail: string;
   supportPhone: string;
+  officeAddress?: string;
   deliveryFee: number;
   freeDeliveryThreshold: number;
+  lagosDeliveryFee?: number;
+  nationwideDeliveryFee?: number;
+  deliveryEstimatedDays?: string;
+  announcementMessages?: string[];
   heroImage?: string;
   heroTagline?: string;
   heroHeadline?: string;
   heroSubhead?: string;
   heroDescription?: string;
   heroButtonText?: string;
+  pagesContent?: Partial<SitePagesContent>;
   updatedAt: string;
 }
 
@@ -125,3 +179,4 @@ export interface FilterState {
   sortBy?: 'newest' | 'price-asc' | 'price-desc' | 'popular';
   searchQuery?: string;
 }
+

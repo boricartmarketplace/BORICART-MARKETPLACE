@@ -13,14 +13,15 @@ import {
 } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage, handleFirestoreError, OperationType } from './config';
-import { Product, Category, Order, OrderStatus, PaymentStatus, StoreSettings } from '../types';
-import { INITIAL_CATEGORIES, INITIAL_PRODUCTS, DEFAULT_SETTINGS } from '../data/initialCatalog';
+import { Product, Category, Order, OrderStatus, PaymentStatus, StoreSettings, AdminUser, AdminRole, SitePagesContent } from '../types';
+import { INITIAL_CATEGORIES, INITIAL_PRODUCTS, DEFAULT_SETTINGS, INITIAL_STAFF } from '../data/initialCatalog';
 
 // Collection references
 const PRODUCTS_COLLECTION = 'products';
 const CATEGORIES_COLLECTION = 'categories';
 const ORDERS_COLLECTION = 'orders';
 const SETTINGS_COLLECTION = 'settings';
+const ADMINS_COLLECTION = 'admins';
 
 // Cache to prevent duplicate auto-seeding
 let isSeedingInProgress = false;
@@ -442,10 +443,78 @@ export async function seedInitialDatabase(force = false): Promise<void> {
     // 3. Seed settings
     await setDoc(doc(db, SETTINGS_COLLECTION, 'general'), DEFAULT_SETTINGS);
 
-    console.log('Boricart database successfully seeded with initial catalog.');
+    // 4. Seed initial staff & roles
+    for (const staff of INITIAL_STAFF) {
+      await setDoc(doc(db, ADMINS_COLLECTION, staff.id), staff);
+    }
+
+    console.log('Boricart database successfully seeded with initial catalog and staff.');
   } catch (error) {
     console.warn('Database seeding note (rules or network):', error);
   } finally {
     isSeedingInProgress = false;
   }
 }
+
+// =================== STAFF & ACCESS PRIVILEGES SERVICES ===================
+
+export async function getStaffMembers(): Promise<AdminUser[]> {
+  try {
+    const snapshot = await getDocs(collection(db, ADMINS_COLLECTION));
+    if (snapshot.empty) {
+      for (const staff of INITIAL_STAFF) {
+        await setDoc(doc(db, ADMINS_COLLECTION, staff.id), staff);
+      }
+      return INITIAL_STAFF;
+    }
+    const staffList: AdminUser[] = [];
+    snapshot.forEach((docSnap) => {
+      staffList.push({ id: docSnap.id, ...(docSnap.data() as Omit<AdminUser, 'id'>) });
+    });
+    return staffList;
+  } catch (error) {
+    console.warn('Error loading staff members, using initial staff list:', error);
+    return INITIAL_STAFF;
+  }
+}
+
+export async function saveStaffMember(
+  memberData: Partial<AdminUser> & { name: string; email: string; role: AdminRole }
+): Promise<AdminUser> {
+  const id = memberData.id || `staff-${slugify(memberData.name)}-${Date.now().toString().slice(-4)}`;
+  const now = new Date().toISOString();
+  const staffMember: AdminUser = {
+    id,
+    name: memberData.name.trim(),
+    email: memberData.email.trim().toLowerCase(),
+    role: memberData.role,
+    status: memberData.status || 'active',
+    phone: memberData.phone || '',
+    createdAt: memberData.createdAt || now,
+    lastActive: memberData.lastActive || now,
+  };
+
+  try {
+    await setDoc(doc(db, ADMINS_COLLECTION, id), staffMember);
+    return staffMember;
+  } catch (error) {
+    handleFirestoreError(error, OperationType.WRITE, `${ADMINS_COLLECTION}/${id}`);
+  }
+}
+
+export async function deleteStaffMember(id: string): Promise<void> {
+  try {
+    await deleteDoc(doc(db, ADMINS_COLLECTION, id));
+  } catch (error) {
+    handleFirestoreError(error, OperationType.DELETE, `${ADMINS_COLLECTION}/${id}`);
+  }
+}
+
+export async function updateStaffStatus(id: string, status: 'active' | 'suspended'): Promise<void> {
+  try {
+    await updateDoc(doc(db, ADMINS_COLLECTION, id), { status });
+  } catch (error) {
+    handleFirestoreError(error, OperationType.UPDATE, `${ADMINS_COLLECTION}/${id}`);
+  }
+}
+

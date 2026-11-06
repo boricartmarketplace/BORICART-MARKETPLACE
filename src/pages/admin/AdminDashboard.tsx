@@ -288,11 +288,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               className="flex items-center gap-3 cursor-pointer"
               onClick={() => onNavigate('home')}
             >
-              <div className="bg-white px-2.5 py-1 rounded-xl flex items-center shadow-xs">
+              <div className="bg-white px-3 py-1.5 rounded-xl flex items-center shadow-xs">
                 <img
-                  src="/assets/aistudio/image_af74bfee.png"
+                  src="/assets/aistudio/boricart_logo.png"
                   alt="BORICART"
-                  className="h-6 sm:h-7 w-auto object-contain"
+                  className="h-7 sm:h-8 w-auto object-contain"
                 />
               </div>
               <div className="hidden sm:block">

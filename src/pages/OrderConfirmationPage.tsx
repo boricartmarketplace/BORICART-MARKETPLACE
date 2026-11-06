@@ -74,9 +74,9 @@ export const OrderConfirmationPage: React.FC<OrderConfirmationPageProps> = ({
         <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-6 border-b border-gray-100 gap-4">
           <div className="flex items-center gap-3">
             <img
-              src="/assets/aistudio/image_af74bfee.png"
+              src="/assets/aistudio/boricart_logo.png"
               alt="BORICART"
-              className="h-10 w-auto object-contain"
+              className="h-10 sm:h-11 w-auto object-contain"
             />
             <div>
               <span className="text-xs text-gray-400 uppercase font-semibold">Order Number</span>
