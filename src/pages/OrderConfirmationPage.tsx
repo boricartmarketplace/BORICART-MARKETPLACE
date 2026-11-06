@@ -12,6 +12,7 @@ import {
 import { Order } from '../types';
 import { formatNaira } from '../firebase/services';
 import { WhatsAppButton } from '../components/common/WhatsAppButton';
+import { trackPurchase } from '../services/pixelService';
 
 interface OrderConfirmationPageProps {
   order: Order | null;
@@ -26,7 +27,10 @@ export const OrderConfirmationPage: React.FC<OrderConfirmationPageProps> = ({
 }) => {
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
-  }, []);
+    if (order) {
+      trackPurchase(order);
+    }
+  }, [order?.id]);
 
   if (!order) {
     return (

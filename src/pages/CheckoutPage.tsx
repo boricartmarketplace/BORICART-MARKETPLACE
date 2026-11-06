@@ -18,6 +18,7 @@ import { useCart } from '../context/CartContext';
 import { formatNaira, createOrder } from '../firebase/services';
 import { NIGERIAN_STATES } from '../data/initialCatalog';
 import { Order } from '../types';
+import { trackInitiateCheckout, trackPurchase } from '../services/pixelService';
 
 interface CheckoutPageProps {
   onNavigate: (page: string, params?: Record<string, any>) => void;
@@ -48,6 +49,13 @@ export const CheckoutPage: React.FC<CheckoutPageProps> = ({
   const isFreeDelivery = subtotal >= freeDeliveryThreshold;
   const effectiveDeliveryFee = isFreeDelivery ? 0 : deliveryFee;
   const grandTotal = subtotal + effectiveDeliveryFee;
+
+  // Track InitiateCheckout on mount if cart has items
+  React.useEffect(() => {
+    if (items.length > 0) {
+      trackInitiateCheckout(items.length, grandTotal);
+    }
+  }, []);
 
   if (items.length === 0) {
     return (
@@ -132,6 +140,9 @@ export const CheckoutPage: React.FC<CheckoutPageProps> = ({
 
       // Clear shopping cart
       clearCart();
+
+      // Trigger Pixel Purchase Event across Facebook, Google, TikTok, Pinterest
+      trackPurchase(savedOrder);
 
       // Navigate to order confirmation
       onNavigate('order-confirmation', { order: savedOrder, orderId: savedOrder.id });

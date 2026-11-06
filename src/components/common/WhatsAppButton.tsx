@@ -2,6 +2,7 @@ import React from 'react';
 import { MessageCircle } from 'lucide-react';
 import { Product, Order, CartItem } from '../../types';
 import { formatNaira } from '../../firebase/services';
+import { trackContact } from '../../services/pixelService';
 
 interface WhatsAppButtonProps {
   phone?: string;
@@ -74,12 +75,17 @@ export const WhatsAppButton: React.FC<WhatsAppButtonProps> = ({
     subtotal,
   });
 
+  const handleClick = () => {
+    trackContact('WhatsApp');
+  };
+
   if (variant === 'floating') {
     return (
       <a
         href={url}
         target="_blank"
         rel="noopener noreferrer"
+        onClick={handleClick}
         aria-label="Chat with Boricart on WhatsApp"
         className={`fixed bottom-6 right-6 z-40 flex items-center gap-2 bg-[#25D366] hover:bg-[#20BD5A] text-white px-4 py-3 rounded-full shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 group ${className}`}
       >
@@ -99,6 +105,7 @@ export const WhatsAppButton: React.FC<WhatsAppButtonProps> = ({
         href={url}
         target="_blank"
         rel="noopener noreferrer"
+        onClick={handleClick}
         className={`inline-flex items-center justify-center gap-2 border border-[#25D366] text-[#25D366] hover:bg-[#25D366]/10 font-semibold px-4 py-2.5 rounded-lg transition-colors text-sm ${className}`}
       >
         <MessageCircle className="w-4 h-4 fill-[#25D366]" />
@@ -113,6 +120,7 @@ export const WhatsAppButton: React.FC<WhatsAppButtonProps> = ({
         href={url}
         target="_blank"
         rel="noopener noreferrer"
+        onClick={handleClick}
         title="Inquire on WhatsApp"
         className={`inline-flex items-center justify-center p-2 rounded-lg bg-[#25D366]/10 text-[#25D366] hover:bg-[#25D366] hover:text-white transition-colors ${className}`}
       >
@@ -126,6 +134,7 @@ export const WhatsAppButton: React.FC<WhatsAppButtonProps> = ({
       href={url}
       target="_blank"
       rel="noopener noreferrer"
+      onClick={handleClick}
       className={`inline-flex items-center justify-center gap-2 bg-[#25D366] hover:bg-[#20BD5A] text-white font-semibold px-5 py-3 rounded-xl transition-colors shadow-sm hover:shadow text-sm ${className}`}
     >
       <MessageCircle className="w-5 h-5 fill-white" />

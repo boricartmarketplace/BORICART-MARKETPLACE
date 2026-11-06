@@ -28,6 +28,7 @@ import { useWishlist } from '../context/WishlistContext';
 import { WhatsAppButton } from '../components/common/WhatsAppButton';
 import { ProductCard } from '../components/common/ProductCard';
 import { NIGERIAN_STATES } from '../data/initialCatalog';
+import { trackViewContent } from '../services/pixelService';
 
 interface ProductDetailPageProps {
   product: Product;
@@ -50,6 +51,11 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
   const [selectedImage, setSelectedImage] = useState<string>(product.mainImage);
   const [quantity, setQuantity] = useState<number>(1);
   const [copiedLink, setCopiedLink] = useState(false);
+
+  // Trigger pixel ViewContent on mount / product change
+  React.useEffect(() => {
+    trackViewContent(product);
+  }, [product.id]);
 
   // In-page Instant Order Form state
   const [showOrderModal, setShowOrderModal] = useState(false);

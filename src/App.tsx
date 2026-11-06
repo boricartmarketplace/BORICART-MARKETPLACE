@@ -26,6 +26,7 @@ import {
   getStoreSettings,
 } from './firebase/services';
 import { DEFAULT_SETTINGS } from './data/initialCatalog';
+import { initPixels, trackPageView } from './services/pixelService';
 
 function MainApp() {
   const { isAdmin } = useAuth();
@@ -38,6 +39,13 @@ function MainApp() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [settings, setSettings] = useState<StoreSettings>(DEFAULT_SETTINGS);
   const [isLoading, setIsLoading] = useState<boolean>(true);
+
+  // Initialize pixels when settings update
+  useEffect(() => {
+    if (settings.pixels) {
+      initPixels(settings.pixels);
+    }
+  }, [settings.pixels]);
 
   // Load store data from Firestore
   const loadData = async () => {
@@ -52,6 +60,10 @@ function MainApp() {
       setCategories(fetchedCategories);
       setSettings(fetchedSettings);
 
+      if (fetchedSettings?.pixels) {
+        initPixels(fetchedSettings.pixels);
+      }
+
       if (isAdmin) {
         const fetchedOrders = await getOrders();
         setOrders(fetchedOrders);
@@ -65,6 +77,7 @@ function MainApp() {
 
   useEffect(() => {
     loadData();
+    trackPageView('Home', '/');
   }, [isAdmin]);
 
   // Navigate handler
@@ -72,6 +85,7 @@ function MainApp() {
     setCurrentRoute(page);
     setRouteParams(params);
     window.scrollTo({ top: 0, behavior: 'smooth' });
+    trackPageView(page.charAt(0).toUpperCase() + page.slice(1), `/${page}`);
   };
 
   // Find active product for product detail route

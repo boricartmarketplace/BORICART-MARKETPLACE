@@ -158,6 +158,18 @@ export interface SitePagesContent {
   privacyContent?: string;
 }
 
+export interface PixelSettings {
+  facebookPixelId?: string;
+  facebookPixelEnabled?: boolean;
+  googleTagId?: string; // e.g. G-XXXXXXX or AW-XXXXXXXX
+  googleTagEnabled?: boolean;
+  tiktokPixelId?: string;
+  tiktokPixelEnabled?: boolean;
+  pinterestTagId?: string;
+  pinterestTagEnabled?: boolean;
+  testMode?: boolean;
+}
+
 export interface StoreSettings {
   whatsappNumber: string;
   storeName: string;
@@ -177,6 +189,7 @@ export interface StoreSettings {
   heroDescription?: string;
   heroButtonText?: string;
   pagesContent?: Partial<SitePagesContent>;
+  pixels?: PixelSettings;
   updatedAt: string;
 }
 

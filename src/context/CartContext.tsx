@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { CartItem, Product } from '../types';
+import { trackAddToCart } from '../services/pixelService';
 
 interface CartContextType {
   items: CartItem[];
@@ -60,6 +61,8 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return [...prev, { product, quantity: finalQty }];
       }
     });
+
+    trackAddToCart(product, quantity);
 
     setToastMessage(`Added "${product.name}" to cart`);
     setTimeout(() => {

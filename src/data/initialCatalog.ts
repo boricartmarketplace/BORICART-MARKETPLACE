@@ -553,6 +553,17 @@ export const DEFAULT_SETTINGS: StoreSettings = {
   heroDescription: 'Discover practical products designed to make everyday life easier, smarter and more convenient.',
   heroButtonText: 'Shop Now',
   pagesContent: DEFAULT_PAGES_CONTENT,
+  pixels: {
+    facebookPixelId: '',
+    facebookPixelEnabled: true,
+    googleTagId: '',
+    googleTagEnabled: true,
+    tiktokPixelId: '',
+    tiktokPixelEnabled: true,
+    pinterestTagId: '',
+    pinterestTagEnabled: true,
+    testMode: false,
+  },
   updatedAt: new Date().toISOString(),
 };
 

@@ -20,6 +20,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useWishlist } from '../../context/WishlistContext';
 import { Category, Product, StoreSettings } from '../../types';
 import { formatNaira } from '../../firebase/services';
+import { trackSearch } from '../../services/pixelService';
 
 interface HeaderProps {
   categories: Category[];
@@ -99,6 +100,7 @@ export const Header: React.FC<HeaderProps> = ({
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (searchQuery.trim()) {
+      trackSearch(searchQuery.trim());
       setIsSearchFocused(false);
       onNavigate('shop', { search: searchQuery.trim() });
     }

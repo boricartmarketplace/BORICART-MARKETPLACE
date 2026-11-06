@@ -32,7 +32,7 @@ import {
   Building,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
-import { Product, Category, Order, OrderStatus, PaymentStatus, StoreSettings, AdminRole } from '../../types';
+import { Product, Category, Order, OrderStatus, PaymentStatus, StoreSettings, AdminRole, PixelSettings } from '../../types';
 import {
   formatNaira,
   saveProduct,
@@ -49,6 +49,7 @@ import { CategoryFormModal } from './CategoryFormModal';
 import { OrderDetailsModal } from './OrderDetailsModal';
 import { StaffManagementTab } from './StaffManagementTab';
 import { PagesCmsTab } from './PagesCmsTab';
+import { PixelSettingsCard } from './PixelSettingsCard';
 
 interface AdminDashboardProps {
   products: Product[];
@@ -156,6 +157,21 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   );
   const [isUploadingHero, setIsUploadingHero] = useState<boolean>(false);
 
+  // Marketing & Tracking Pixels state
+  const [pixels, setPixels] = useState<PixelSettings>(
+    settings.pixels || {
+      facebookPixelId: '',
+      facebookPixelEnabled: true,
+      googleTagId: '',
+      googleTagEnabled: true,
+      tiktokPixelId: '',
+      tiktokPixelEnabled: true,
+      pinterestTagId: '',
+      pinterestTagEnabled: true,
+      testMode: false,
+    }
+  );
+
   const [settingsSuccess, setSettingsSuccess] = useState(false);
   const [isSeeding, setIsSeeding] = useState(false);
 
@@ -182,6 +198,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         'Discover practical products designed to make everyday life easier, smarter and more convenient.'
     );
     setHeroButtonText(settings.heroButtonText || 'Shop Now');
+    if (settings.pixels) {
+      setPixels(settings.pixels);
+    }
   }, [settings]);
 
   // Analytics Metrics
@@ -331,6 +350,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       heroSubhead,
       heroDescription,
       heroButtonText,
+      pixels,
     });
     await onRefreshData();
     setSettingsSuccess(true);
@@ -1574,6 +1594,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   </div>
                 </div>
               </div>
+
+              {/* CARD 5: MARKETING & TRACKING PIXELS (FACEBOOK, GOOGLE, TIKTOK, PINTEREST) */}
+              <PixelSettingsCard pixels={pixels} onChange={setPixels} />
 
               {/* Submit Buttons */}
               <div className="pt-2 flex items-center justify-between">
