@@ -1,3 +1,19 @@
+export interface ProductReview {
+  id: string;
+  author: string;
+  location?: string;
+  rating: number; // 1 to 5
+  comment: string;
+  date: string;
+  verifiedBuyer?: boolean;
+}
+
+export interface ProductFaq {
+  id: string;
+  question: string;
+  answer: string;
+}
+
 export interface Product {
   id: string;
   name: string;
@@ -34,6 +50,19 @@ export interface Product {
   heroAdHeadline?: string; // Optional custom advertising headline for hero banner
   rating?: number;
   reviewCount?: number;
+
+  // AI-Powered Sales Page & Urgency extensions
+  storyHeadline?: string; // e.g., "The Story: How Amaka Saved ₦85,000 in Repairs"
+  storyText?: string; // Relatable narrative that connects emotionally with buyers
+  urgencyNotice?: string; // Urgency banner e.g., "⚡ Special Flash Sale: 35% OFF Today + Pay on Delivery!"
+  enableTimer?: boolean; // Show live countdown urgency timer
+  timerHeadline?: string; // e.g., "PROMOTIONAL OFFER EXPIRES IN:"
+  timerHours?: number; // Rolling duration in hours (default: 24)
+  reviewsList?: ProductReview[]; // Custom reviews editable by admin
+  faqsList?: ProductFaq[]; // Product FAQs editable by admin
+  guaranteeText?: string; // Warranty/Guaranty copy
+  freeDeliveryNote?: string; // Delivery incentive copy
+
   createdAt: string;
   updatedAt: string;
 }
