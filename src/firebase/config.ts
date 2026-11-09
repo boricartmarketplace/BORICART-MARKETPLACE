@@ -1,6 +1,6 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
-import { getFirestore, doc, getDocFromServer } from 'firebase/firestore';
+import { initializeFirestore, doc, getDocFromServer } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 import firebaseConfig from '../../firebase-applet-config.json';
 
@@ -31,8 +31,14 @@ export interface FirestoreErrorInfo {
 }
 
 export const app = initializeApp(firebaseConfig);
-// CRITICAL: Must pass firebaseConfig.firestoreDatabaseId to getFirestore
-export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
+// CRITICAL: Initialize Firestore with ignoreUndefinedProperties: true and specific databaseId
+export const db = initializeFirestore(
+  app,
+  {
+    ignoreUndefinedProperties: true,
+  },
+  firebaseConfig.firestoreDatabaseId
+);
 export const auth = getAuth(app);
 export const storage = getStorage(app);
 

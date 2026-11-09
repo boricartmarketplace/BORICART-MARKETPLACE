@@ -210,6 +210,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   const [settingsSuccess, setSettingsSuccess] = useState(false);
   const [isSeeding, setIsSeeding] = useState(false);
+  const [actionNotice, setActionNotice] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+
+  const showActionNotice = (type: 'success' | 'error', message: string) => {
+    setActionNotice({ type, message });
+    setTimeout(() => setActionNotice(null), 4000);
+  };
 
   // Sync settings state when prop updates
   useEffect(() => {
@@ -295,39 +301,75 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   // Handle Product Save
   const handleSaveProduct = async (productData: Partial<Product> & { name: string }) => {
-    await saveProduct(productData);
-    await onRefreshData();
+    try {
+      const saved = await saveProduct(productData);
+      await onRefreshData();
+      showActionNotice(
+        'success',
+        `Product "${saved.name}" successfully ${productData.id ? 'updated' : 'added'}!`
+      );
+    } catch (err: any) {
+      console.error('Error saving product:', err);
+      showActionNotice('error', err?.message || 'Failed to save product.');
+    }
   };
 
   // Handle Product Delete
   const handleDeleteProduct = async (id: string, name: string) => {
     if (window.confirm(`Are you sure you want to delete "${name}"? This action cannot be undone.`)) {
-      await deleteProduct(id);
-      await onRefreshData();
+      try {
+        await deleteProduct(id);
+        await onRefreshData();
+        showActionNotice('success', `Product "${name}" deleted.`);
+      } catch (err: any) {
+        showActionNotice('error', 'Failed to delete product.');
+      }
     }
   };
 
   // Toggle publish / unpublish
   const handleTogglePublish = async (product: Product) => {
-    const newStatus = product.status === 'published' ? 'draft' : 'published';
-    await saveProduct({
-      ...product,
-      status: newStatus,
-    });
-    await onRefreshData();
+    try {
+      const newStatus = product.status === 'published' ? 'draft' : 'published';
+      await saveProduct({
+        ...product,
+        status: newStatus,
+      });
+      await onRefreshData();
+      showActionNotice(
+        'success',
+        `Product "${product.name}" is now ${newStatus === 'published' ? 'Published' : 'Draft'}.`
+      );
+    } catch (err: any) {
+      showActionNotice('error', 'Failed to toggle product status.');
+    }
   };
 
   // Handle Category Save
   const handleSaveCategory = async (catData: Partial<Category> & { name: string }) => {
-    await saveCategory(catData);
-    await onRefreshData();
+    try {
+      const saved = await saveCategory(catData);
+      await onRefreshData();
+      showActionNotice(
+        'success',
+        `Category "${saved.name}" successfully ${catData.id ? 'updated' : 'created'}!`
+      );
+    } catch (err: any) {
+      console.error('Error saving category:', err);
+      showActionNotice('error', err?.message || 'Failed to save category.');
+    }
   };
 
   // Handle Category Delete
   const handleDeleteCategory = async (id: string, name: string) => {
     if (window.confirm(`Are you sure you want to delete category "${name}"?`)) {
-      await deleteCategory(id);
-      await onRefreshData();
+      try {
+        await deleteCategory(id);
+        await onRefreshData();
+        showActionNotice('success', `Category "${name}" deleted.`);
+      } catch (err: any) {
+        showActionNotice('error', 'Failed to delete category.');
+      }
     }
   };
 
@@ -446,31 +488,40 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   // Handle Settings Save (Delivery details, hero, support, announcements, hero ads)
   const handleSaveSettings = async (e: React.FormEvent) => {
     e.preventDefault();
-    await updateStoreSettings({
-      whatsappNumber,
-      deliveryFee: Number(deliveryFee),
-      freeDeliveryThreshold: Number(freeDeliveryThreshold),
-      lagosDeliveryFee: Number(lagosDeliveryFee),
-      nationwideDeliveryFee: Number(nationwideDeliveryFee),
-      deliveryEstimatedDays,
-      officeAddress,
-      announcementMessages: announcements,
-      supportEmail,
-      supportPhone,
-      heroImage,
-      heroTagline,
-      heroHeadline,
-      heroSubhead,
-      heroDescription,
-      heroButtonText,
-      heroSelectedProductIds,
-      heroAdsSlides,
-      heroAutoScrollInterval: Number(heroAutoScrollInterval),
-      pixels,
-    });
-    await onRefreshData();
-    setSettingsSuccess(true);
-    setTimeout(() => setSettingsSuccess(false), 3000);
+    try {
+      await updateStoreSettings({
+        whatsappNumber,
+        deliveryFee: Number(deliveryFee),
+        freeDeliveryThreshold: Number(freeDeliveryThreshold),
+        lagosDeliveryFee: Number(lagosDeliveryFee),
+        nationwideDeliveryFee: Number(nationwideDeliveryFee),
+        deliveryEstimatedDays,
+        officeAddress,
+        announcementMessages: announcements,
+        supportEmail,
+        supportPhone,
+        heroImage,
+        heroTagline,
+        heroHeadline,
+        heroSubhead,
+        heroDescription,
+        heroButtonText,
+        heroSelectedProductIds,
+        heroAdsSlides,
+        heroAutoScrollInterval: Number(heroAutoScrollInterval),
+        pixels,
+      });
+      await onRefreshData();
+      setSettingsSuccess(true);
+      showActionNotice(
+        'success',
+        'Store, Delivery, and Hero Ads configuration successfully updated and saved!'
+      );
+      setTimeout(() => setSettingsSuccess(false), 4000);
+    } catch (err: any) {
+      console.error('Error saving store settings:', err);
+      showActionNotice('error', 'Failed to save store settings. Please try again.');
+    }
   };
 
   // Handle Database Re-seed
@@ -709,6 +760,32 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
       {/* Main Tab View */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+        {actionNotice && (
+          <div
+            className={`p-4 rounded-2xl text-xs sm:text-sm font-bold flex items-center justify-between border shadow-xs animate-in fade-in ${
+              actionNotice.type === 'success'
+                ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
+                : 'bg-red-50 border-red-200 text-red-800'
+            }`}
+          >
+            <div className="flex items-center gap-2.5">
+              {actionNotice.type === 'success' ? (
+                <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
+              ) : (
+                <AlertTriangle className="w-5 h-5 text-red-600 shrink-0" />
+              )}
+              <span>{actionNotice.message}</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setActionNotice(null)}
+              className="text-gray-400 hover:text-gray-700 text-xs px-2 py-1 rounded-lg"
+            >
+              ✕
+            </button>
+          </div>
+        )}
+
         {/* TAB 1: OVERVIEW */}
         {activeTab === 'overview' && (
           <div className="space-y-8">

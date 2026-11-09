@@ -63,9 +63,14 @@ export const StaffManagementTab: React.FC<StaffManagementTabProps> = ({ currentA
     phone?: string;
     password?: string;
   }) => {
-    await saveStaffMember(staffData);
-    await loadStaff();
-    showNotification('success', `Access privilege granted to ${staffData.name} as ${staffData.role.replace('_', ' ')}!`);
+    try {
+      await saveStaffMember(staffData);
+      await loadStaff();
+      showNotification('success', `Access privilege granted to ${staffData.name} as ${staffData.role.replace('_', ' ')}!`);
+    } catch (err: any) {
+      console.error('Error adding staff:', err);
+      showNotification('error', err?.message || 'Failed to add staff member.');
+    }
   };
 
   const handleRoleChange = async (member: AdminUser, newRole: AdminRole) => {
@@ -73,12 +78,16 @@ export const StaffManagementTab: React.FC<StaffManagementTabProps> = ({ currentA
       showNotification('error', 'Primary Master Super Admin role cannot be modified.');
       return;
     }
-    await saveStaffMember({
-      ...member,
-      role: newRole,
-    });
-    await loadStaff();
-    showNotification('success', `Updated privilege for ${member.name} to ${newRole.replace('_', ' ')}.`);
+    try {
+      await saveStaffMember({
+        ...member,
+        role: newRole,
+      });
+      await loadStaff();
+      showNotification('success', `Updated privilege for ${member.name} to ${newRole.replace('_', ' ')}.`);
+    } catch (err: any) {
+      showNotification('error', 'Failed to update staff role.');
+    }
   };
 
   const handleToggleStatus = async (member: AdminUser) => {
@@ -86,13 +95,17 @@ export const StaffManagementTab: React.FC<StaffManagementTabProps> = ({ currentA
       showNotification('error', 'Master Super Admin cannot be suspended.');
       return;
     }
-    const newStatus = member.status === 'active' ? 'suspended' : 'active';
-    await updateStaffStatus(member.id, newStatus);
-    await loadStaff();
-    showNotification(
-      'success',
-      `${member.name} status updated to ${newStatus.toUpperCase()}`
-    );
+    try {
+      const newStatus = member.status === 'active' ? 'suspended' : 'active';
+      await updateStaffStatus(member.id, newStatus);
+      await loadStaff();
+      showNotification(
+        'success',
+        `${member.name} status updated to ${newStatus.toUpperCase()}`
+      );
+    } catch (err: any) {
+      showNotification('error', 'Failed to toggle staff status.');
+    }
   };
 
   const handleDeleteStaff = async (member: AdminUser) => {
@@ -101,9 +114,13 @@ export const StaffManagementTab: React.FC<StaffManagementTabProps> = ({ currentA
       return;
     }
     if (window.confirm(`Are you sure you want to revoke access and delete staff profile for "${member.name}"?`)) {
-      await deleteStaffMember(member.id);
-      await loadStaff();
-      showNotification('success', `Staff member ${member.name} removed successfully.`);
+      try {
+        await deleteStaffMember(member.id);
+        await loadStaff();
+        showNotification('success', `Staff member ${member.name} removed successfully.`);
+      } catch (err: any) {
+        showNotification('error', 'Failed to remove staff member.');
+      }
     }
   };
 

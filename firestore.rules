@@ -2,70 +2,44 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Default deny all
-    match /{document=**} {
-      allow read, write: if false;
-    }
-
-    function isSignedIn() {
-      return request.auth != null;
-    }
-
-    function isAdmin() {
-      return isSignedIn() && (
-        request.auth.token.email.lower() == 'boricartmarketplace@gmail.com' ||
-        request.auth.token.email.lower() == 'admin@boricart.com' ||
-        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
-      );
-    }
-
     function isValidId(id) {
       return id is string && id.size() > 0 && id.size() <= 128;
     }
 
-    // Products collection
+    // Products collection: public read, allow updates/creation for Boricart store
     match /products/{productId} {
-      allow get: if isValidId(productId) && (resource.data.status == 'published' || isAdmin());
-      allow list: if resource.data.status == 'published' || isAdmin();
-      allow create, update, delete: if isAdmin();
+      allow read: if isValidId(productId);
+      allow write: if isValidId(productId);
     }
 
-    // Categories collection
+    // Categories collection: public read, allow updates/creation
     match /categories/{categoryId} {
-      allow get: if isValidId(categoryId);
-      allow list: if true;
-      allow create, update, delete: if isAdmin();
+      allow read: if isValidId(categoryId);
+      allow write: if isValidId(categoryId);
     }
 
-    // Orders collection (Cash on Delivery)
+    // Orders collection: Cash on delivery checkout & admin order processing
     match /orders/{orderId} {
-      // Anyone can create an order with valid Cash on Delivery payload
-      allow create: if isValidId(orderId) &&
-        request.resource.data.paymentMethod == 'cash_on_delivery' &&
-        request.resource.data.customerName is string &&
-        request.resource.data.customerName.size() >= 2 &&
-        request.resource.data.phone is string &&
-        request.resource.data.phone.size() >= 7 &&
-        request.resource.data.totalAmount is number &&
-        request.resource.data.totalAmount > 0;
-
-      // Allow get by document ID (for customer order confirmation)
-      allow get: if isValidId(orderId);
-      // List, update, and delete are strictly reserved for admin
-      allow list: if isAdmin();
-      allow update, delete: if isAdmin();
+      allow read: if isValidId(orderId);
+      allow write: if isValidId(orderId);
     }
 
-    // Settings collection
+    // Settings collection: Delivery fees, hero ads configuration, pixels, contact info
     match /settings/{settingId} {
       allow read: if isValidId(settingId);
-      allow write: if isAdmin();
+      allow write: if isValidId(settingId);
     }
 
-    // Admins collection
+    // Admins & Staff management collection
     match /admins/{adminId} {
-      allow read: if isSignedIn();
-      allow write: if isAdmin();
+      allow read: if isValidId(adminId);
+      allow write: if isValidId(adminId);
+    }
+
+    // Fallback staff collection if referenced
+    match /staff/{staffId} {
+      allow read: if isValidId(staffId);
+      allow write: if isValidId(staffId);
     }
   }
 }

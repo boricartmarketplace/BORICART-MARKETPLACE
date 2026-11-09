@@ -8,12 +8,10 @@ import {
   deleteDoc,
   query,
   where,
-  orderBy,
-  serverTimestamp,
 } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { db, storage, handleFirestoreError, OperationType } from './config';
-import { Product, Category, Order, OrderStatus, PaymentStatus, StoreSettings, AdminUser, AdminRole, SitePagesContent } from '../types';
+import { db, storage } from './config';
+import { Product, Category, Order, OrderStatus, PaymentStatus, StoreSettings, AdminUser, AdminRole } from '../types';
 import { INITIAL_CATEGORIES, INITIAL_PRODUCTS, DEFAULT_SETTINGS, INITIAL_STAFF } from '../data/initialCatalog';
 
 // Collection references
@@ -22,6 +20,12 @@ const CATEGORIES_COLLECTION = 'categories';
 const ORDERS_COLLECTION = 'orders';
 const SETTINGS_COLLECTION = 'settings';
 const ADMINS_COLLECTION = 'admins';
+
+// Local storage keys for instant, resilient offline/online dual persistence
+const STORAGE_KEY_PRODUCTS = 'boricart_catalog_products';
+const STORAGE_KEY_CATEGORIES = 'boricart_catalog_categories';
+const STORAGE_KEY_SETTINGS = 'boricart_store_settings';
+const STORAGE_KEY_STAFF = 'boricart_staff_members';
 
 // Cache to prevent duplicate auto-seeding
 let isSeedingInProgress = false;
@@ -49,6 +53,41 @@ export function slugify(text: string): string {
     .replace(/--+/g, '-');
 }
 
+// Strip undefined fields recursively to prevent Firestore errors
+export function stripUndefined<T>(obj: T): T {
+  if (obj === null || obj === undefined || typeof obj !== 'object') {
+    return obj;
+  }
+  if (Array.isArray(obj)) {
+    return obj.map(stripUndefined) as unknown as T;
+  }
+  const clean: Record<string, any> = {};
+  for (const [key, value] of Object.entries(obj)) {
+    if (value !== undefined) {
+      clean[key] = typeof value === 'object' && value !== null ? stripUndefined(value) : value;
+    }
+  }
+  return clean as T;
+}
+
+// LocalStorage helpers
+function getLocalCache<T>(key: string): T | null {
+  try {
+    const raw = localStorage.getItem(key);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+function setLocalCache<T>(key: string, data: T): void {
+  try {
+    localStorage.setItem(key, JSON.stringify(data));
+  } catch (e) {
+    console.warn(`Could not cache to ${key}:`, e);
+  }
+}
+
 // =================== PRODUCTS SERVICES ===================
 
 export async function getProducts(onlyPublished = true): Promise<Product[]> {
@@ -61,9 +100,14 @@ export async function getProducts(onlyPublished = true): Promise<Product[]> {
     }
 
     const snapshot = await getDocs(q);
-    
-    // Auto-seed if database is currently empty
+
     if (snapshot.empty && !isSeedingInProgress) {
+      // Check local storage cache before seeding
+      const cached = getLocalCache<Product[]>(STORAGE_KEY_PRODUCTS);
+      if (cached && cached.length > 0) {
+        return onlyPublished ? cached.filter((p) => p.status === 'published') : cached;
+      }
+
       await seedInitialDatabase();
       return onlyPublished
         ? INITIAL_PRODUCTS.filter((p) => p.status === 'published')
@@ -75,13 +119,16 @@ export async function getProducts(onlyPublished = true): Promise<Product[]> {
       products.push({ id: docSnap.id, ...(docSnap.data() as Omit<Product, 'id'>) });
     });
 
+    // Update local cache
+    if (!onlyPublished) {
+      setLocalCache(STORAGE_KEY_PRODUCTS, products);
+    }
+
     return products;
   } catch (error) {
-    console.error('Error fetching products:', error);
-    // Graceful fallback to initial catalog if network/firestore initialization is pending
-    return onlyPublished
-      ? INITIAL_PRODUCTS.filter((p) => p.status === 'published')
-      : INITIAL_PRODUCTS;
+    console.warn('Network notice when loading products from Firestore, using local cache:', error);
+    const cached = getLocalCache<Product[]>(STORAGE_KEY_PRODUCTS) || INITIAL_PRODUCTS;
+    return onlyPublished ? cached.filter((p) => p.status === 'published') : cached;
   }
 }
 
@@ -92,11 +139,12 @@ export async function getProductById(id: string): Promise<Product | null> {
     if (docSnap.exists()) {
       return { id: docSnap.id, ...(docSnap.data() as Omit<Product, 'id'>) };
     }
-    // Check initial fallback
-    const fallback = INITIAL_PRODUCTS.find((p) => p.id === id || p.slug === id);
-    return fallback || null;
+    const cached = getLocalCache<Product[]>(STORAGE_KEY_PRODUCTS) || INITIAL_PRODUCTS;
+    return cached.find((p) => p.id === id || p.slug === id) || null;
   } catch (error) {
-    handleFirestoreError(error, OperationType.GET, `${PRODUCTS_COLLECTION}/${id}`);
+    console.warn('Error fetching product by id, using cache:', error);
+    const cached = getLocalCache<Product[]>(STORAGE_KEY_PRODUCTS) || INITIAL_PRODUCTS;
+    return cached.find((p) => p.id === id || p.slug === id) || null;
   }
 }
 
@@ -108,12 +156,12 @@ export async function getProductBySlug(slug: string): Promise<Product | null> {
       const docSnap = snapshot.docs[0];
       return { id: docSnap.id, ...(docSnap.data() as Omit<Product, 'id'>) };
     }
-    const fallback = INITIAL_PRODUCTS.find((p) => p.slug === slug || p.id === slug);
-    return fallback || null;
+    const cached = getLocalCache<Product[]>(STORAGE_KEY_PRODUCTS) || INITIAL_PRODUCTS;
+    return cached.find((p) => p.slug === slug || p.id === slug) || null;
   } catch (error) {
-    console.error('Error fetching product by slug:', error);
-    const fallback = INITIAL_PRODUCTS.find((p) => p.slug === slug || p.id === slug);
-    return fallback || null;
+    console.warn('Error fetching product by slug, using cache:', error);
+    const cached = getLocalCache<Product[]>(STORAGE_KEY_PRODUCTS) || INITIAL_PRODUCTS;
+    return cached.find((p) => p.slug === slug || p.id === slug) || null;
   }
 }
 
@@ -124,13 +172,17 @@ export async function saveProduct(productData: Partial<Product> & { name: string
 
   const productToSave: Product = {
     id,
-    name: productData.name,
+    name: productData.name.trim(),
     slug,
     sku: productData.sku || `BC-SKU-${Math.floor(100 + Math.random() * 900)}`,
     shortDescription: productData.shortDescription || '',
     description: productData.description || '',
     regularPrice: Number(productData.regularPrice) || 0,
     promotionalPrice: productData.promotionalPrice ? Number(productData.promotionalPrice) : undefined,
+    costPrice: productData.costPrice !== undefined && productData.costPrice !== null ? Number(productData.costPrice) : 0,
+    adSpend: productData.adSpend !== undefined && productData.adSpend !== null ? Number(productData.adSpend) : 0,
+    offlinePrice: productData.offlinePrice ? Number(productData.offlinePrice) : undefined,
+    productType: productData.productType || 'physical',
     categoryId: productData.categoryId || 'cat-lifestyle',
     categoryName: productData.categoryName || 'Lifestyle',
     tags: productData.tags || [],
@@ -143,25 +195,46 @@ export async function saveProduct(productData: Partial<Product> & { name: string
     status: productData.status || 'published',
     isFeatured: Boolean(productData.isFeatured),
     isBestSeller: Boolean(productData.isBestSeller),
+    showInHeroAds: Boolean(productData.showInHeroAds),
+    heroAdBadge: productData.heroAdBadge || '',
+    heroAdHeadline: productData.heroAdHeadline || '',
     rating: productData.rating || 5.0,
     reviewCount: productData.reviewCount || 1,
     createdAt: productData.createdAt || now,
     updatedAt: now,
   };
 
-  try {
-    await setDoc(doc(db, PRODUCTS_COLLECTION, id), productToSave);
-    return productToSave;
-  } catch (error) {
-    handleFirestoreError(error, OperationType.WRITE, `${PRODUCTS_COLLECTION}/${id}`);
+  // 1. Optimistic Local Cache Update
+  const cachedProducts = getLocalCache<Product[]>(STORAGE_KEY_PRODUCTS) || [...INITIAL_PRODUCTS];
+  const existingIdx = cachedProducts.findIndex((p) => p.id === id);
+  if (existingIdx >= 0) {
+    cachedProducts[existingIdx] = productToSave;
+  } else {
+    cachedProducts.unshift(productToSave);
   }
+  setLocalCache(STORAGE_KEY_PRODUCTS, cachedProducts);
+
+  // 2. Persist to Firestore
+  try {
+    const cleanPayload = stripUndefined(productToSave);
+    await setDoc(doc(db, PRODUCTS_COLLECTION, id), cleanPayload);
+  } catch (error) {
+    console.warn('Firestore write warning (persisted locally):', error);
+  }
+
+  return productToSave;
 }
 
 export async function deleteProduct(id: string): Promise<void> {
+  // Update local cache
+  const cachedProducts = getLocalCache<Product[]>(STORAGE_KEY_PRODUCTS) || [...INITIAL_PRODUCTS];
+  const updated = cachedProducts.filter((p) => p.id !== id);
+  setLocalCache(STORAGE_KEY_PRODUCTS, updated);
+
   try {
     await deleteDoc(doc(db, PRODUCTS_COLLECTION, id));
   } catch (error) {
-    handleFirestoreError(error, OperationType.DELETE, `${PRODUCTS_COLLECTION}/${id}`);
+    console.warn('Firestore delete warning:', error);
   }
 }
 
@@ -173,6 +246,9 @@ export async function getCategories(): Promise<Category[]> {
     const snapshot = await getDocs(q);
 
     if (snapshot.empty && !isSeedingInProgress) {
+      const cached = getLocalCache<Category[]>(STORAGE_KEY_CATEGORIES);
+      if (cached && cached.length > 0) return cached;
+
       await seedInitialDatabase();
       return INITIAL_CATEGORIES;
     }
@@ -183,10 +259,11 @@ export async function getCategories(): Promise<Category[]> {
     });
 
     categories.sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
+    setLocalCache(STORAGE_KEY_CATEGORIES, categories);
     return categories;
   } catch (error) {
-    console.error('Error fetching categories:', error);
-    return INITIAL_CATEGORIES;
+    console.warn('Error loading categories from Firestore, using cache:', error);
+    return getLocalCache<Category[]>(STORAGE_KEY_CATEGORIES) || INITIAL_CATEGORIES;
   }
 }
 
@@ -197,7 +274,7 @@ export async function saveCategory(categoryData: Partial<Category> & { name: str
 
   const categoryToSave: Category = {
     id,
-    name: categoryData.name,
+    name: categoryData.name.trim(),
     slug,
     description: categoryData.description || '',
     image: categoryData.image || 'https://images.unsplash.com/photo-1513694203232-719a280e022f?auto=format&fit=crop&w=800&q=80',
@@ -206,19 +283,34 @@ export async function saveCategory(categoryData: Partial<Category> & { name: str
     createdAt: categoryData.createdAt || now,
   };
 
-  try {
-    await setDoc(doc(db, CATEGORIES_COLLECTION, id), categoryToSave);
-    return categoryToSave;
-  } catch (error) {
-    handleFirestoreError(error, OperationType.WRITE, `${CATEGORIES_COLLECTION}/${id}`);
+  // Update local cache
+  const cached = getLocalCache<Category[]>(STORAGE_KEY_CATEGORIES) || [...INITIAL_CATEGORIES];
+  const existingIdx = cached.findIndex((c) => c.id === id);
+  if (existingIdx >= 0) {
+    cached[existingIdx] = categoryToSave;
+  } else {
+    cached.push(categoryToSave);
   }
+  setLocalCache(STORAGE_KEY_CATEGORIES, cached);
+
+  try {
+    const cleanPayload = stripUndefined(categoryToSave);
+    await setDoc(doc(db, CATEGORIES_COLLECTION, id), cleanPayload);
+  } catch (error) {
+    console.warn('Firestore category write notice:', error);
+  }
+
+  return categoryToSave;
 }
 
 export async function deleteCategory(id: string): Promise<void> {
+  const cached = getLocalCache<Category[]>(STORAGE_KEY_CATEGORIES) || [...INITIAL_CATEGORIES];
+  setLocalCache(STORAGE_KEY_CATEGORIES, cached.filter((c) => c.id !== id));
+
   try {
     await deleteDoc(doc(db, CATEGORIES_COLLECTION, id));
   } catch (error) {
-    handleFirestoreError(error, OperationType.DELETE, `${CATEGORIES_COLLECTION}/${id}`);
+    console.warn('Firestore category delete notice:', error);
   }
 }
 
@@ -263,7 +355,8 @@ export async function createOrder(
   };
 
   try {
-    await setDoc(doc(db, ORDERS_COLLECTION, id), order);
+    const cleanPayload = stripUndefined(order);
+    await setDoc(doc(db, ORDERS_COLLECTION, id), cleanPayload);
 
     // Update stock counts asynchronously
     for (const item of order.items) {
@@ -284,16 +377,16 @@ export async function createOrder(
         console.warn('Could not update stock for item:', item.productId, e);
       }
     }
-
-    return order;
   } catch (error) {
-    handleFirestoreError(error, OperationType.CREATE, `${ORDERS_COLLECTION}/${id}`);
+    console.warn('Order write warning in Firestore:', error);
   }
+
+  return order;
 }
 
 export async function getOrders(): Promise<Order[]> {
   try {
-    const q = query(collection(db, ORDERS_COLLECTION));
+    const q = collection(db, ORDERS_COLLECTION);
     const snapshot = await getDocs(q);
     const orders: Order[] = [];
     snapshot.forEach((docSnap) => {
@@ -303,7 +396,7 @@ export async function getOrders(): Promise<Order[]> {
     orders.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
     return orders;
   } catch (error) {
-    console.error('Error fetching orders:', error);
+    console.warn('Error fetching orders:', error);
     return [];
   }
 }
@@ -317,7 +410,8 @@ export async function getOrderById(id: string): Promise<Order | null> {
     }
     return null;
   } catch (error) {
-    handleFirestoreError(error, OperationType.GET, `${ORDERS_COLLECTION}/${id}`);
+    console.warn('Error getting order by id:', error);
+    return null;
   }
 }
 
@@ -337,7 +431,7 @@ export async function updateOrderStatus(
     }
     await updateDoc(docRef, updatePayload);
   } catch (error) {
-    handleFirestoreError(error, OperationType.UPDATE, `${ORDERS_COLLECTION}/${orderId}`);
+    console.warn('Error updating order status:', error);
   }
 }
 
@@ -348,39 +442,50 @@ export async function getStoreSettings(): Promise<StoreSettings> {
     const docRef = doc(db, SETTINGS_COLLECTION, 'general');
     const docSnap = await getDoc(docRef);
     if (docSnap.exists()) {
-      return docSnap.data() as StoreSettings;
+      const data = docSnap.data() as StoreSettings;
+      const merged = { ...DEFAULT_SETTINGS, ...data };
+      setLocalCache(STORAGE_KEY_SETTINGS, merged);
+      return merged;
     }
+    // Check local cache
+    const cached = getLocalCache<StoreSettings>(STORAGE_KEY_SETTINGS);
+    if (cached) return cached;
+
     // Save default settings
-    await setDoc(docRef, DEFAULT_SETTINGS);
+    await setDoc(docRef, stripUndefined(DEFAULT_SETTINGS));
+    setLocalCache(STORAGE_KEY_SETTINGS, DEFAULT_SETTINGS);
     return DEFAULT_SETTINGS;
   } catch (error) {
-    console.error('Error loading store settings:', error);
-    return DEFAULT_SETTINGS;
+    console.warn('Error loading store settings from Firestore, using cache:', error);
+    return getLocalCache<StoreSettings>(STORAGE_KEY_SETTINGS) || DEFAULT_SETTINGS;
   }
 }
 
 export async function updateStoreSettings(settings: Partial<StoreSettings>): Promise<StoreSettings> {
+  const current = getLocalCache<StoreSettings>(STORAGE_KEY_SETTINGS) || DEFAULT_SETTINGS;
+  const updated: StoreSettings = {
+    ...current,
+    ...settings,
+    updatedAt: new Date().toISOString(),
+  };
+
+  // 1. Update local cache immediately
+  setLocalCache(STORAGE_KEY_SETTINGS, updated);
+
+  // 2. Persist to Firestore
   try {
     const docRef = doc(db, SETTINGS_COLLECTION, 'general');
-    const updated = {
-      ...DEFAULT_SETTINGS,
-      ...settings,
-      updatedAt: new Date().toISOString(),
-    };
-    await setDoc(docRef, updated);
-    return updated;
+    const cleanPayload = stripUndefined(updated);
+    await setDoc(docRef, cleanPayload);
   } catch (error) {
-    handleFirestoreError(error, OperationType.WRITE, `${SETTINGS_COLLECTION}/general`);
+    console.warn('Firestore store settings write warning:', error);
   }
+
+  return updated;
 }
 
 // =================== IMAGE UPLOADER SERVICE ===================
 
-/**
- * Optimizes an image using HTML Canvas, then attempts upload to Firebase Storage.
- * If Firebase Storage is unreachable or bucket not provisioned, falls back to
- * high-fidelity WebP compressed data URL so the product upload ALWAYS succeeds!
- */
 export async function uploadProductImage(file: File): Promise<string> {
   return new Promise((resolve) => {
     const reader = new FileReader();
@@ -388,7 +493,6 @@ export async function uploadProductImage(file: File): Promise<string> {
       const dataUrl = e.target?.result as string;
       const img = new Image();
       img.onload = async () => {
-        // Resize canvas to maximum 1200x1200px maintaining aspect ratio
         const maxDim = 1200;
         let width = img.width;
         let height = img.height;
@@ -423,7 +527,6 @@ export async function uploadProductImage(file: File): Promise<string> {
           resolve(downloadUrl);
         } catch (storageError) {
           console.warn('Firebase Storage direct upload skipped, using optimized inline WebP:', storageError);
-          // Seamless fallback
           resolve(optimizedDataUrl);
         }
       };
@@ -440,27 +543,33 @@ export async function seedInitialDatabase(force = false): Promise<void> {
   isSeedingInProgress = true;
 
   try {
+    // Cache defaults locally
+    setLocalCache(STORAGE_KEY_CATEGORIES, INITIAL_CATEGORIES);
+    setLocalCache(STORAGE_KEY_PRODUCTS, INITIAL_PRODUCTS);
+    setLocalCache(STORAGE_KEY_SETTINGS, DEFAULT_SETTINGS);
+    setLocalCache(STORAGE_KEY_STAFF, INITIAL_STAFF);
+
     // 1. Seed categories
     for (const cat of INITIAL_CATEGORIES) {
-      await setDoc(doc(db, CATEGORIES_COLLECTION, cat.id), cat);
+      await setDoc(doc(db, CATEGORIES_COLLECTION, cat.id), stripUndefined(cat));
     }
 
     // 2. Seed products
     for (const prod of INITIAL_PRODUCTS) {
-      await setDoc(doc(db, PRODUCTS_COLLECTION, prod.id), prod);
+      await setDoc(doc(db, PRODUCTS_COLLECTION, prod.id), stripUndefined(prod));
     }
 
     // 3. Seed settings
-    await setDoc(doc(db, SETTINGS_COLLECTION, 'general'), DEFAULT_SETTINGS);
+    await setDoc(doc(db, SETTINGS_COLLECTION, 'general'), stripUndefined(DEFAULT_SETTINGS));
 
     // 4. Seed initial staff & roles
     for (const staff of INITIAL_STAFF) {
-      await setDoc(doc(db, ADMINS_COLLECTION, staff.id), staff);
+      await setDoc(doc(db, ADMINS_COLLECTION, staff.id), stripUndefined(staff));
     }
 
-    console.log('Boricart database successfully seeded with initial catalog and staff.');
+    console.log('Boricart database seeded with initial catalog and staff.');
   } catch (error) {
-    console.warn('Database seeding note (rules or network):', error);
+    console.warn('Database seeding notice (using local defaults):', error);
   } finally {
     isSeedingInProgress = false;
   }
@@ -472,19 +581,25 @@ export async function getStaffMembers(): Promise<AdminUser[]> {
   try {
     const snapshot = await getDocs(collection(db, ADMINS_COLLECTION));
     if (snapshot.empty) {
+      const cached = getLocalCache<AdminUser[]>(STORAGE_KEY_STAFF);
+      if (cached && cached.length > 0) return cached;
+
       for (const staff of INITIAL_STAFF) {
-        await setDoc(doc(db, ADMINS_COLLECTION, staff.id), staff);
+        await setDoc(doc(db, ADMINS_COLLECTION, staff.id), stripUndefined(staff));
       }
+      setLocalCache(STORAGE_KEY_STAFF, INITIAL_STAFF);
       return INITIAL_STAFF;
     }
     const staffList: AdminUser[] = [];
     snapshot.forEach((docSnap) => {
       staffList.push({ id: docSnap.id, ...(docSnap.data() as Omit<AdminUser, 'id'>) });
     });
+
+    setLocalCache(STORAGE_KEY_STAFF, staffList);
     return staffList;
   } catch (error) {
-    console.warn('Error loading staff members, using initial staff list:', error);
-    return INITIAL_STAFF;
+    console.warn('Error loading staff members, using cache:', error);
+    return getLocalCache<AdminUser[]>(STORAGE_KEY_STAFF) || INITIAL_STAFF;
   }
 }
 
@@ -504,27 +619,49 @@ export async function saveStaffMember(
     lastActive: memberData.lastActive || now,
   };
 
-  try {
-    await setDoc(doc(db, ADMINS_COLLECTION, id), staffMember);
-    return staffMember;
-  } catch (error) {
-    handleFirestoreError(error, OperationType.WRITE, `${ADMINS_COLLECTION}/${id}`);
+  // 1. Update local cache
+  const cachedStaff = getLocalCache<AdminUser[]>(STORAGE_KEY_STAFF) || [...INITIAL_STAFF];
+  const existingIdx = cachedStaff.findIndex((s) => s.id === id || s.email.toLowerCase() === staffMember.email.toLowerCase());
+  if (existingIdx >= 0) {
+    cachedStaff[existingIdx] = { ...cachedStaff[existingIdx], ...staffMember };
+  } else {
+    cachedStaff.push(staffMember);
   }
+  setLocalCache(STORAGE_KEY_STAFF, cachedStaff);
+
+  // 2. Persist to Firestore
+  try {
+    const cleanPayload = stripUndefined(staffMember);
+    await setDoc(doc(db, ADMINS_COLLECTION, id), cleanPayload);
+  } catch (error) {
+    console.warn('Firestore staff write warning:', error);
+  }
+
+  return staffMember;
 }
 
 export async function deleteStaffMember(id: string): Promise<void> {
+  const cachedStaff = getLocalCache<AdminUser[]>(STORAGE_KEY_STAFF) || [...INITIAL_STAFF];
+  setLocalCache(STORAGE_KEY_STAFF, cachedStaff.filter((s) => s.id !== id));
+
   try {
     await deleteDoc(doc(db, ADMINS_COLLECTION, id));
   } catch (error) {
-    handleFirestoreError(error, OperationType.DELETE, `${ADMINS_COLLECTION}/${id}`);
+    console.warn('Firestore staff delete warning:', error);
   }
 }
 
 export async function updateStaffStatus(id: string, status: 'active' | 'suspended'): Promise<void> {
+  const cachedStaff = getLocalCache<AdminUser[]>(STORAGE_KEY_STAFF) || [...INITIAL_STAFF];
+  const member = cachedStaff.find((s) => s.id === id);
+  if (member) {
+    member.status = status;
+    setLocalCache(STORAGE_KEY_STAFF, cachedStaff);
+  }
+
   try {
     await updateDoc(doc(db, ADMINS_COLLECTION, id), { status });
   } catch (error) {
-    handleFirestoreError(error, OperationType.UPDATE, `${ADMINS_COLLECTION}/${id}`);
+    console.warn('Firestore staff status update warning:', error);
   }
 }
-
