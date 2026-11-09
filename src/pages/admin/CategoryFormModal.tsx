@@ -206,7 +206,7 @@ export const CategoryFormModal: React.FC<CategoryFormModalProps> = ({
               </button>
               <button
                 type="submit"
-                disabled={isSaving || isUploading}
+                disabled={isSaving}
                 className="px-5 py-2 bg-[#F5A623] hover:bg-[#D98200] disabled:bg-gray-300 text-white text-xs font-bold rounded-xl shadow-xs"
               >
                 {isSaving ? 'Saving...' : 'Save Category'}

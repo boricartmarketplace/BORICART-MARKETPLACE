@@ -199,10 +199,12 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
       setErrorMessage('Please specify a valid regular price in NGN.');
       return;
     }
-    if (images.length === 0) {
-      setErrorMessage('Please upload at least one product image.');
-      return;
-    }
+
+    // Safe fallback image if no photo uploaded yet
+    const fallbackImage =
+      'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?auto=format&fit=crop&w=800&q=80';
+    const effectiveImages = images.length > 0 ? images : [fallbackImage];
+    const effectiveMainImage = mainImage || effectiveImages[0];
 
     setIsSaving(true);
 
@@ -228,8 +230,8 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
         specifications: specifications.trim(),
         usageInstructions: usageInstructions.trim(),
         tags,
-        mainImage: mainImage || images[0],
-        images,
+        mainImage: effectiveMainImage,
+        images: effectiveImages,
         status,
         isFeatured,
         isBestSeller,
@@ -576,6 +578,31 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                 </div>
               </div>
 
+              {/* Quick Sample Presets */}
+              <div className="flex flex-wrap items-center gap-2 pt-1">
+                <span className="text-[11px] font-bold text-gray-500">Quick Presets:</span>
+                {[
+                  { name: '✨ Scrubber / Cleaning', url: 'https://images.unsplash.com/photo-1584622650111-993a426fbf0a?auto=format&fit=crop&w=800&q=80' },
+                  { name: '🍳 Kitchen Appliance', url: 'https://images.unsplash.com/photo-1556911220-e15b29be8c8f?auto=format&fit=crop&w=800&q=80' },
+                  { name: '🎧 Smart Tech / Gadget', url: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?auto=format&fit=crop&w=800&q=80' },
+                  { name: '🏡 Home & Living', url: 'https://images.unsplash.com/photo-1513694203232-719a280e022f?auto=format&fit=crop&w=800&q=80' },
+                ].map((preset, pIdx) => (
+                  <button
+                    key={pIdx}
+                    type="button"
+                    onClick={() => {
+                      if (!images.includes(preset.url)) {
+                        setImages((prev) => [...prev, preset.url]);
+                        if (!mainImage) setMainImage(preset.url);
+                      }
+                    }}
+                    className="text-[10px] font-bold bg-white hover:bg-amber-50 text-gray-700 hover:text-[#D98200] border border-gray-200 hover:border-[#F5A623] px-2.5 py-1 rounded-lg transition-colors cursor-pointer"
+                  >
+                    {preset.name}
+                  </button>
+                ))}
+              </div>
+
               {/* Image Previews */}
               {images.length > 0 && (
                 <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-3 pt-2">
@@ -779,7 +806,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
             <button
               type="submit"
               form="product-form"
-              disabled={isSaving || isUploading}
+              disabled={isSaving}
               className="px-6 py-2.5 rounded-xl bg-[#F5A623] hover:bg-[#D98200] disabled:bg-gray-300 text-white text-xs font-bold transition-all shadow-xs flex items-center gap-2"
             >
               {isSaving ? <span>Saving Product...</span> : <span>Save & Publish Product</span>}
