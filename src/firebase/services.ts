@@ -12,7 +12,7 @@ import {
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage } from './config';
 import { Product, Category, Order, OrderStatus, PaymentStatus, StoreSettings, AdminUser, AdminRole } from '../types';
-import { INITIAL_CATEGORIES, INITIAL_PRODUCTS, DEFAULT_SETTINGS, INITIAL_STAFF } from '../data/initialCatalog';
+import { INITIAL_CATEGORIES, INITIAL_PRODUCTS, DEFAULT_SETTINGS, INITIAL_STAFF, INITIAL_ORDERS } from '../data/initialCatalog';
 
 // Collection references
 const PRODUCTS_COLLECTION = 'products';
@@ -26,6 +26,7 @@ const STORAGE_KEY_PRODUCTS = 'boricart_catalog_products';
 const STORAGE_KEY_CATEGORIES = 'boricart_catalog_categories';
 const STORAGE_KEY_SETTINGS = 'boricart_store_settings';
 const STORAGE_KEY_STAFF = 'boricart_staff_members';
+const STORAGE_KEY_ORDERS = 'boricart_customer_orders';
 
 // Cache to prevent duplicate auto-seeding
 let isSeedingInProgress = false;
@@ -228,7 +229,7 @@ export async function saveProduct(productData: Partial<Product> & { name: string
 export async function deleteProduct(id: string): Promise<void> {
   // Update local cache
   const cachedProducts = getLocalCache<Product[]>(STORAGE_KEY_PRODUCTS) || [...INITIAL_PRODUCTS];
-  const updated = cachedProducts.filter((p) => p.id !== id);
+  const updated = cachedProducts.filter((p) => p.id !== id && p.slug !== id);
   setLocalCache(STORAGE_KEY_PRODUCTS, updated);
 
   try {
@@ -305,7 +306,7 @@ export async function saveCategory(categoryData: Partial<Category> & { name: str
 
 export async function deleteCategory(id: string): Promise<void> {
   const cached = getLocalCache<Category[]>(STORAGE_KEY_CATEGORIES) || [...INITIAL_CATEGORIES];
-  setLocalCache(STORAGE_KEY_CATEGORIES, cached.filter((c) => c.id !== id));
+  setLocalCache(STORAGE_KEY_CATEGORIES, cached.filter((c) => c.id !== id && c.slug !== id));
 
   try {
     await deleteDoc(doc(db, CATEGORIES_COLLECTION, id));
@@ -354,6 +355,21 @@ export async function createOrder(
     updatedAt: now,
   };
 
+  // 1. Immediately cache in localStorage so order is NEVER lost and displays instantly
+  const cachedOrders = getLocalCache<Order[]>(STORAGE_KEY_ORDERS) || [...INITIAL_ORDERS];
+  cachedOrders.unshift(order);
+  setLocalCache(STORAGE_KEY_ORDERS, cachedOrders);
+
+  // 2. Broadcast order creation event across components
+  try {
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('boricart:order_created', { detail: order }));
+    }
+  } catch (e) {
+    console.warn('Order event dispatch notice:', e);
+  }
+
+  // 3. Persist to Firestore
   try {
     const cleanPayload = stripUndefined(order);
     await setDoc(doc(db, ORDERS_COLLECTION, id), cleanPayload);
@@ -378,7 +394,7 @@ export async function createOrder(
       }
     }
   } catch (error) {
-    console.warn('Order write warning in Firestore:', error);
+    console.warn('Order write warning in Firestore (saved locally):', error);
   }
 
   return order;
@@ -388,16 +404,35 @@ export async function getOrders(): Promise<Order[]> {
   try {
     const q = collection(db, ORDERS_COLLECTION);
     const snapshot = await getDocs(q);
-    const orders: Order[] = [];
+    const firestoreOrders: Order[] = [];
     snapshot.forEach((docSnap) => {
-      orders.push({ id: docSnap.id, ...(docSnap.data() as Omit<Order, 'id'>) });
+      firestoreOrders.push({ id: docSnap.id, ...(docSnap.data() as Omit<Order, 'id'>) });
     });
-    // Sort descending by date
-    orders.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-    return orders;
+
+    // Merge Firestore orders with cached orders and INITIAL_ORDERS
+    const cached = getLocalCache<Order[]>(STORAGE_KEY_ORDERS) || INITIAL_ORDERS;
+    const orderMap = new Map<string, Order>();
+
+    // Initial / cached orders first
+    cached.forEach((o) => {
+      if (o.id) orderMap.set(o.id, o);
+    });
+
+    // Firestore orders take precedence if updated
+    firestoreOrders.forEach((o) => {
+      if (o.id) orderMap.set(o.id, o);
+    });
+
+    const merged = Array.from(orderMap.values());
+    merged.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+    // Update local cache
+    setLocalCache(STORAGE_KEY_ORDERS, merged);
+    return merged;
   } catch (error) {
-    console.warn('Error fetching orders:', error);
-    return [];
+    console.warn('Error fetching orders from Firestore, using cache:', error);
+    const cached = getLocalCache<Order[]>(STORAGE_KEY_ORDERS) || INITIAL_ORDERS;
+    return cached.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   }
 }
 
@@ -408,10 +443,12 @@ export async function getOrderById(id: string): Promise<Order | null> {
     if (docSnap.exists()) {
       return { id: docSnap.id, ...(docSnap.data() as Omit<Order, 'id'>) };
     }
-    return null;
+    const cached = getLocalCache<Order[]>(STORAGE_KEY_ORDERS) || INITIAL_ORDERS;
+    return cached.find((o) => o.id === id || o.orderNumber === id) || null;
   } catch (error) {
     console.warn('Error getting order by id:', error);
-    return null;
+    const cached = getLocalCache<Order[]>(STORAGE_KEY_ORDERS) || INITIAL_ORDERS;
+    return cached.find((o) => o.id === id || o.orderNumber === id) || null;
   }
 }
 
@@ -420,6 +457,19 @@ export async function updateOrderStatus(
   status: OrderStatus,
   paymentStatus?: PaymentStatus
 ): Promise<void> {
+  // Update local cache immediately
+  const cached = getLocalCache<Order[]>(STORAGE_KEY_ORDERS) || INITIAL_ORDERS;
+  const target = cached.find((o) => o.id === orderId);
+  if (target) {
+    target.status = status;
+    if (paymentStatus) {
+      target.paymentStatus = paymentStatus;
+    }
+    target.updatedAt = new Date().toISOString();
+    setLocalCache(STORAGE_KEY_ORDERS, cached);
+  }
+
+  // Update in Firestore
   try {
     const docRef = doc(db, ORDERS_COLLECTION, orderId);
     const updatePayload: Record<string, any> = {
@@ -431,7 +481,21 @@ export async function updateOrderStatus(
     }
     await updateDoc(docRef, updatePayload);
   } catch (error) {
-    console.warn('Error updating order status:', error);
+    console.warn('Error updating order status in Firestore:', error);
+  }
+}
+
+export async function deleteOrder(orderId: string): Promise<void> {
+  // Remove from local cache
+  const cached = getLocalCache<Order[]>(STORAGE_KEY_ORDERS) || INITIAL_ORDERS;
+  const filtered = cached.filter((o) => o.id !== orderId);
+  setLocalCache(STORAGE_KEY_ORDERS, filtered);
+
+  // Delete from Firestore
+  try {
+    await deleteDoc(doc(db, ORDERS_COLLECTION, orderId));
+  } catch (error) {
+    console.warn('Error deleting order in Firestore:', error);
   }
 }
 

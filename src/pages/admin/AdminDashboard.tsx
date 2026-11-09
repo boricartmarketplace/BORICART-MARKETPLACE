@@ -211,6 +211,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [settingsSuccess, setSettingsSuccess] = useState(false);
   const [isSeeding, setIsSeeding] = useState(false);
   const [actionNotice, setActionNotice] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState<{
+    isOpen: boolean;
+    type: 'product' | 'category' | 'reseed';
+    id?: string;
+    name?: string;
+  } | null>(null);
 
   const showActionNotice = (type: 'success' | 'error', message: string) => {
     setActionNotice({ type, message });
@@ -314,17 +320,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     }
   };
 
-  // Handle Product Delete
-  const handleDeleteProduct = async (id: string, name: string) => {
-    if (window.confirm(`Are you sure you want to delete "${name}"? This action cannot be undone.`)) {
-      try {
-        await deleteProduct(id);
-        await onRefreshData();
-        showActionNotice('success', `Product "${name}" deleted.`);
-      } catch (err: any) {
-        showActionNotice('error', 'Failed to delete product.');
-      }
-    }
+  // Trigger Product Delete Modal
+  const handleDeleteProduct = (id: string, name: string) => {
+    setDeleteConfirm({ isOpen: true, type: 'product', id, name });
   };
 
   // Toggle publish / unpublish
@@ -360,17 +358,45 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     }
   };
 
-  // Handle Category Delete
-  const handleDeleteCategory = async (id: string, name: string) => {
-    if (window.confirm(`Are you sure you want to delete category "${name}"?`)) {
+  // Trigger Category Delete Modal
+  const handleDeleteCategory = (id: string, name: string) => {
+    setDeleteConfirm({ isOpen: true, type: 'category', id, name });
+  };
+
+  // Execute Confirmed Delete or Action
+  const handleExecuteConfirmedAction = async () => {
+    if (!deleteConfirm) return;
+
+    if (deleteConfirm.type === 'product' && deleteConfirm.id) {
       try {
-        await deleteCategory(id);
+        await deleteProduct(deleteConfirm.id);
         await onRefreshData();
-        showActionNotice('success', `Category "${name}" deleted.`);
+        showActionNotice('success', `Product "${deleteConfirm.name}" successfully deleted.`);
+      } catch (err: any) {
+        showActionNotice('error', 'Failed to delete product.');
+      }
+    } else if (deleteConfirm.type === 'category' && deleteConfirm.id) {
+      try {
+        await deleteCategory(deleteConfirm.id);
+        await onRefreshData();
+        showActionNotice('success', `Category "${deleteConfirm.name}" successfully deleted.`);
       } catch (err: any) {
         showActionNotice('error', 'Failed to delete category.');
       }
+    } else if (deleteConfirm.type === 'reseed') {
+      try {
+        setIsSeeding(true);
+        await seedInitialDatabase(true);
+        await onRefreshData();
+        showActionNotice('success', 'Default store catalog reloaded successfully.');
+      } catch (err: any) {
+        showActionNotice('error', 'Failed to reload catalog.');
+      } finally {
+        setIsSeeding(false);
+      }
     }
+
+    setDeleteConfirm(null);
   };
 
   // Handle Order Status Update
@@ -525,17 +551,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   };
 
   // Handle Database Re-seed
-  const handleReseed = async () => {
-    if (
-      window.confirm(
-        'Reload default catalog data? This ensures standard categories and best-selling products exist in Firestore.'
-      )
-    ) {
-      setIsSeeding(true);
-      await seedInitialDatabase(true);
-      await onRefreshData();
-      setIsSeeding(false);
-    }
+  const handleReseed = () => {
+    setDeleteConfirm({
+      isOpen: true,
+      type: 'reseed',
+      name: 'Default Store Catalog',
+    });
   };
 
   const getRoleBadge = (role: AdminRole) => {
@@ -1303,6 +1324,19 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   <option value="cancelled">Cancelled</option>
                   <option value="failed_delivery">Failed Delivery</option>
                 </select>
+
+                <button
+                  type="button"
+                  onClick={async () => {
+                    await onRefreshData();
+                    showActionNotice('success', 'Orders list refreshed.');
+                  }}
+                  className="p-2.5 bg-gray-50 hover:bg-gray-100 text-gray-600 hover:text-gray-900 rounded-xl border border-gray-200 transition-colors flex items-center gap-1.5 text-xs font-bold cursor-pointer"
+                  title="Refresh Orders"
+                >
+                  <RefreshCw className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Refresh</span>
+                </button>
               </div>
             </div>
 
@@ -2214,6 +2248,48 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         onOrderCreated={onRefreshData}
         cashierName={staffUser?.name || user?.displayName || 'Overall Admin'}
       />
+
+      {/* In-App Confirmation Modal (Bypasses iframe alert/confirm suppression) */}
+      {deleteConfirm?.isOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 sm:p-8 shadow-2xl border border-gray-100 text-center space-y-4">
+            <div className="w-14 h-14 rounded-2xl bg-red-50 text-red-600 mx-auto flex items-center justify-center shadow-xs">
+              <Trash2 className="w-7 h-7" />
+            </div>
+
+            <div>
+              <h3 className="font-black text-lg text-gray-900">
+                {deleteConfirm.type === 'product' && 'Delete Product?'}
+                {deleteConfirm.type === 'category' && 'Delete Category?'}
+                {deleteConfirm.type === 'reseed' && 'Reload Default Catalog?'}
+              </h3>
+              <p className="text-xs text-gray-500 mt-1.5 leading-relaxed">
+                {deleteConfirm.type === 'reseed'
+                  ? 'This will ensure standard categories and starter best-sellers are initialized in your store.'
+                  : `Are you sure you want to permanently delete "${deleteConfirm.name}"? This action cannot be undone.`}
+              </p>
+            </div>
+
+            <div className="pt-2 flex items-center justify-center gap-3">
+              <button
+                type="button"
+                onClick={() => setDeleteConfirm(null)}
+                className="px-5 py-2.5 rounded-xl border border-gray-300 text-xs font-bold text-gray-700 hover:bg-gray-100 transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+
+              <button
+                type="button"
+                onClick={handleExecuteConfirmedAction}
+                className="px-6 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-bold transition-all shadow-xs cursor-pointer"
+              >
+                {deleteConfirm.type === 'reseed' ? 'Yes, Reload' : 'Yes, Delete'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

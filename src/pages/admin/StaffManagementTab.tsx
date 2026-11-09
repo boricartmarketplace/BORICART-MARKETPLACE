@@ -34,6 +34,7 @@ export const StaffManagementTab: React.FC<StaffManagementTabProps> = ({ currentA
   const [searchQuery, setSearchQuery] = useState('');
   const [roleFilter, setRoleFilter] = useState<string>('all');
   const [feedbackMessage, setFeedbackMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [staffToDelete, setStaffToDelete] = useState<AdminUser | null>(null);
 
   const loadStaff = async () => {
     try {
@@ -108,19 +109,24 @@ export const StaffManagementTab: React.FC<StaffManagementTabProps> = ({ currentA
     }
   };
 
-  const handleDeleteStaff = async (member: AdminUser) => {
+  const handleDeleteStaff = (member: AdminUser) => {
     if (member.email === 'boricartmarketplace@gmail.com') {
       showNotification('error', 'Master Super Admin cannot be removed.');
       return;
     }
-    if (window.confirm(`Are you sure you want to revoke access and delete staff profile for "${member.name}"?`)) {
-      try {
-        await deleteStaffMember(member.id);
-        await loadStaff();
-        showNotification('success', `Staff member ${member.name} removed successfully.`);
-      } catch (err: any) {
-        showNotification('error', 'Failed to remove staff member.');
-      }
+    setStaffToDelete(member);
+  };
+
+  const confirmDeleteStaff = async () => {
+    if (!staffToDelete) return;
+    try {
+      await deleteStaffMember(staffToDelete.id);
+      await loadStaff();
+      showNotification('success', `Staff member ${staffToDelete.name} removed successfully.`);
+    } catch (err: any) {
+      showNotification('error', 'Failed to remove staff member.');
+    } finally {
+      setStaffToDelete(null);
     }
   };
 
@@ -390,6 +396,43 @@ export const StaffManagementTab: React.FC<StaffManagementTabProps> = ({ currentA
         onClose={() => setIsAddModalOpen(false)}
         onSave={handleAddStaff}
       />
+
+      {/* In-App Confirmation Modal for Revoking Staff */}
+      {staffToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 sm:p-8 shadow-2xl border border-gray-100 text-center space-y-4">
+            <div className="w-14 h-14 rounded-2xl bg-red-50 text-red-600 mx-auto flex items-center justify-center shadow-xs">
+              <Trash2 className="w-7 h-7" />
+            </div>
+
+            <div>
+              <h3 className="font-black text-lg text-gray-900">Revoke Staff Access?</h3>
+              <p className="text-xs text-gray-500 mt-1.5 leading-relaxed">
+                Are you sure you want to revoke access and delete the administrative profile for{' '}
+                <strong className="text-gray-900">{staffToDelete.name}</strong> ({staffToDelete.email})?
+              </p>
+            </div>
+
+            <div className="pt-2 flex items-center justify-center gap-3">
+              <button
+                type="button"
+                onClick={() => setStaffToDelete(null)}
+                className="px-5 py-2.5 rounded-xl border border-gray-300 text-xs font-bold text-gray-700 hover:bg-gray-100 transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+
+              <button
+                type="button"
+                onClick={confirmDeleteStaff}
+                className="px-6 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-bold transition-all shadow-xs cursor-pointer"
+              >
+                Yes, Revoke Access
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

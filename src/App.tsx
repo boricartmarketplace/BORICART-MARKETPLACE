@@ -50,23 +50,20 @@ function MainApp() {
   // Load store data from Firestore
   const loadData = async () => {
     try {
-      const [fetchedProducts, fetchedCategories, fetchedSettings] = await Promise.all([
+      const [fetchedProducts, fetchedCategories, fetchedSettings, fetchedOrders] = await Promise.all([
         getProducts(!isAdmin),
         getCategories(),
         getStoreSettings(),
+        getOrders(),
       ]);
 
       setProducts(fetchedProducts);
       setCategories(fetchedCategories);
       setSettings(fetchedSettings);
+      setOrders(fetchedOrders);
 
       if (fetchedSettings?.pixels) {
         initPixels(fetchedSettings.pixels);
-      }
-
-      if (isAdmin) {
-        const fetchedOrders = await getOrders();
-        setOrders(fetchedOrders);
       }
     } catch (err) {
       console.error('Data loading error:', err);
@@ -79,6 +76,20 @@ function MainApp() {
     loadData();
     trackPageView('Home', '/');
   }, [isAdmin]);
+
+  // Listen to live customer order creation events across checkout & offline POS
+  useEffect(() => {
+    const handleOrderCreated = (event: Event) => {
+      const customEvent = event as CustomEvent<Order>;
+      if (customEvent.detail) {
+        setOrders((prev) => [customEvent.detail, ...prev.filter((o) => o.id !== customEvent.detail.id)]);
+      }
+      loadData();
+    };
+
+    window.addEventListener('boricart:order_created', handleOrderCreated);
+    return () => window.removeEventListener('boricart:order_created', handleOrderCreated);
+  }, []);
 
   // Check URL hash/parameters for direct dedicated link to admin portal (#admin, #dashboard, ?admin=true)
   useEffect(() => {

@@ -6,40 +6,40 @@ service cloud.firestore {
       return id is string && id.size() > 0 && id.size() <= 128;
     }
 
-    // Products collection: public read, allow updates/creation for Boricart store
+    // Products collection: allow catalog list, get and writes
     match /products/{productId} {
-      allow read: if isValidId(productId);
-      allow write: if isValidId(productId);
+      allow list: if true;
+      allow get, write: if isValidId(productId);
     }
 
-    // Categories collection: public read, allow updates/creation
+    // Categories collection: allow catalog list, get and writes
     match /categories/{categoryId} {
-      allow read: if isValidId(categoryId);
-      allow write: if isValidId(categoryId);
+      allow list: if true;
+      allow get, write: if isValidId(categoryId);
     }
 
-    // Orders collection: Cash on delivery checkout & admin order processing
+    // Orders collection: allow admin list, customer get, and writes
     match /orders/{orderId} {
-      allow read: if isValidId(orderId);
-      allow write: if isValidId(orderId);
+      allow list: if true;
+      allow get, write: if isValidId(orderId);
     }
 
-    // Settings collection: Delivery fees, hero ads configuration, pixels, contact info
+    // Settings collection: allow store settings list, get and writes
     match /settings/{settingId} {
-      allow read: if isValidId(settingId);
-      allow write: if isValidId(settingId);
+      allow list: if true;
+      allow get, write: if isValidId(settingId);
     }
 
     // Admins & Staff management collection
     match /admins/{adminId} {
-      allow read: if isValidId(adminId);
-      allow write: if isValidId(adminId);
+      allow list: if true;
+      allow get, write: if isValidId(adminId);
     }
 
-    // Fallback staff collection if referenced
+    // Fallback staff collection
     match /staff/{staffId} {
-      allow read: if isValidId(staffId);
-      allow write: if isValidId(staffId);
+      allow list: if true;
+      allow get, write: if isValidId(staffId);
     }
   }
 }
