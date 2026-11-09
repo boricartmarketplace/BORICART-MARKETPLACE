@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { CartProvider, useCart } from './context/CartContext';
 import { WishlistProvider } from './context/WishlistContext';
@@ -26,7 +26,70 @@ import {
   getStoreSettings,
 } from './firebase/services';
 import { DEFAULT_SETTINGS } from './data/initialCatalog';
-import { initPixels, trackPageView } from './services/pixelService';
+import { initPixels, trackPageView, captureAdAttribution } from './services/pixelService';
+
+// Parse initial route from URL path, query, or hash
+function parseRouteFromLocation(isAdminUser: boolean): { route: string; params: Record<string, any> } {
+  const pathname = window.location.pathname.toLowerCase();
+  const search = new URLSearchParams(window.location.search);
+  const hash = window.location.hash.toLowerCase();
+
+  // 1. Dedicated Admin Portal Links (/admin, /admin-login, /admin-dashboard, #admin, ?admin=true)
+  if (
+    pathname === '/admin' ||
+    pathname.startsWith('/admin/') ||
+    pathname === '/admin-login' ||
+    pathname === '/admin-dashboard' ||
+    hash === '#admin' ||
+    hash === '#dashboard' ||
+    hash === '#admin-login' ||
+    hash === '#admin-dashboard' ||
+    search.has('admin')
+  ) {
+    return { route: isAdminUser ? 'admin-dashboard' : 'admin-login', params: {} };
+  }
+
+  // 2. Product Sales Page Links (/product/:slug, #/product/:slug, ?product=:slug)
+  if (pathname.startsWith('/product/')) {
+    const slug = pathname.replace('/product/', '').split('/')[0].split('?')[0];
+    if (slug) return { route: 'product', params: { slug } };
+  }
+  if (hash.startsWith('#/product/')) {
+    const slug = hash.replace('#/product/', '').split('/')[0].split('?')[0];
+    if (slug) return { route: 'product', params: { slug } };
+  }
+  if (search.has('product')) {
+    const slug = search.get('product') || '';
+    if (slug) return { route: 'product', params: { slug } };
+  }
+
+  // 3. Category Links (/category/:slug, #/category/:slug, ?category=:slug)
+  if (pathname.startsWith('/category/')) {
+    const slug = pathname.replace('/category/', '').split('/')[0].split('?')[0];
+    if (slug) return { route: 'category', params: { categoryId: slug, slug } };
+  }
+  if (hash.startsWith('#/category/')) {
+    const slug = hash.replace('#/category/', '').split('/')[0].split('?')[0];
+    if (slug) return { route: 'category', params: { categoryId: slug, slug } };
+  }
+  if (search.has('category')) {
+    const slug = search.get('category') || '';
+    if (slug) return { route: 'category', params: { categoryId: slug, slug } };
+  }
+
+  // 4. Standard Static Pages
+  if (pathname === '/shop' || hash === '#/shop') return { route: 'shop', params: {} };
+  if (pathname === '/cart' || hash === '#/cart') return { route: 'cart', params: {} };
+  if (pathname === '/checkout' || hash === '#/checkout') return { route: 'checkout', params: {} };
+  if (pathname === '/order-confirmation' || hash === '#/order-confirmation') return { route: 'order-confirmation', params: {} };
+  if (pathname === '/contact' || hash === '#/contact') return { route: 'contact', params: {} };
+  if (pathname === '/about' || hash === '#/about') return { route: 'about', params: {} };
+  if (pathname === '/delivery-policy' || hash === '#/delivery-policy') return { route: 'delivery-policy', params: {} };
+  if (pathname === '/terms' || hash === '#/terms') return { route: 'terms', params: {} };
+  if (pathname === '/privacy' || hash === '#/privacy') return { route: 'privacy', params: {} };
+
+  return { route: 'home', params: {} };
+}
 
 function MainApp() {
   const { isAdmin } = useAuth();
@@ -74,7 +137,6 @@ function MainApp() {
 
   useEffect(() => {
     loadData();
-    trackPageView('Home', '/');
   }, [isAdmin]);
 
   // Listen to live customer order creation events across checkout & offline POS
@@ -91,54 +153,104 @@ function MainApp() {
     return () => window.removeEventListener('boricart:order_created', handleOrderCreated);
   }, []);
 
-  // Check URL hash/parameters for direct dedicated link to admin portal (#admin, #dashboard, ?admin=true)
+  // Parse initial route and capture UTM ad attribution from URL on boot
   useEffect(() => {
-    const checkAdminUrl = () => {
-      const hash = window.location.hash.toLowerCase();
-      const search = window.location.search.toLowerCase();
-      const pathname = window.location.pathname.toLowerCase();
+    captureAdAttribution();
+    const initial = parseRouteFromLocation(isAdmin);
+    setCurrentRoute(initial.route);
+    setRouteParams(initial.params);
 
-      if (
-        hash === '#admin' ||
-        hash === '#dashboard' ||
-        hash === '#admin-login' ||
-        hash === '#admin-dashboard' ||
-        search.includes('admin') ||
-        pathname.endsWith('/admin')
-      ) {
-        setCurrentRoute(isAdmin ? 'admin-dashboard' : 'admin-login');
-      }
+    const handleLocationChange = () => {
+      captureAdAttribution();
+      const updated = parseRouteFromLocation(isAdmin);
+      setCurrentRoute(updated.route);
+      setRouteParams(updated.params);
     };
 
-    checkAdminUrl();
-    window.addEventListener('hashchange', checkAdminUrl);
-    return () => window.removeEventListener('hashchange', checkAdminUrl);
+    window.addEventListener('popstate', handleLocationChange);
+    window.addEventListener('hashchange', handleLocationChange);
+    return () => {
+      window.removeEventListener('popstate', handleLocationChange);
+      window.removeEventListener('hashchange', handleLocationChange);
+    };
   }, [isAdmin]);
 
-  // Navigate handler
-  const handleNavigate = (page: string, params: Record<string, any> = {}) => {
-    setCurrentRoute(page);
-    setRouteParams(params);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+  // Dynamic SEO & Title synchronization
+  useEffect(() => {
+    const baseTitle = 'BORICART — Everyday Solutions. Better Living.';
 
-    // Keep URL hash in sync for private dashboard link
-    if (page === 'admin-dashboard' || page === 'admin-login') {
-      if (window.location.hash !== '#admin') {
-        window.history.replaceState(null, '', '#admin');
+    if (currentRoute === 'product') {
+      const activeProd = products.find((p) => p.slug === routeParams.slug || p.id === routeParams.id);
+      if (activeProd) {
+        document.title = `${activeProd.name} — Buy Online & Pay on Delivery | Boricart`;
       }
+    } else if (currentRoute === 'category') {
+      const activeCat = categories.find((c) => c.slug === routeParams.slug || c.id === routeParams.categoryId);
+      if (activeCat) {
+        document.title = `${activeCat.name} Solutions — Boricart Nigeria`;
+      }
+    } else if (currentRoute === 'shop') {
+      document.title = 'Shop Everyday Solutions — Boricart Nigeria';
+    } else if (currentRoute === 'cart') {
+      document.title = 'Shopping Cart — Boricart Nigeria';
+    } else if (currentRoute === 'checkout') {
+      document.title = 'Cash on Delivery Checkout — Boricart Nigeria';
+    } else if (currentRoute === 'admin-dashboard' || currentRoute === 'admin-login') {
+      document.title = 'Boricart Portal — Staff & Store Management';
     } else {
-      if (window.location.hash === '#admin') {
-        window.history.replaceState(null, '', window.location.pathname);
-      }
+      document.title = baseTitle;
     }
+  }, [currentRoute, routeParams, products, categories]);
 
-    trackPageView(page.charAt(0).toUpperCase() + page.slice(1), `/${page}`);
-  };
+  // Navigate handler that synchronizes clean URLs, history, and pixel tracking
+  const handleNavigate = useCallback(
+    (page: string, params: Record<string, any> = {}) => {
+      setCurrentRoute(page);
+      setRouteParams(params);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+
+      // Determine clean URL path
+      let path = '/';
+      if (page === 'product') {
+        const slug = params.slug || params.id || '';
+        path = `/product/${slug}`;
+      } else if (page === 'category') {
+        const slug = params.slug || params.categoryId || '';
+        path = `/category/${slug}`;
+      } else if (page === 'admin-dashboard' || page === 'admin-login') {
+        path = '/admin';
+      } else if (page !== 'home') {
+        path = `/${page}`;
+      }
+
+      // Update browser URL seamlessly preserving UTM parameters
+      try {
+        const currentUrl = new URL(window.location.href);
+        currentUrl.pathname = path;
+
+        // Keep hash in sync for instant #admin access if requested
+        if (page === 'admin-dashboard' || page === 'admin-login') {
+          currentUrl.hash = '#admin';
+        } else if (currentUrl.hash === '#admin') {
+          currentUrl.hash = '';
+        }
+
+        window.history.pushState(null, '', currentUrl.pathname + currentUrl.search + currentUrl.hash);
+      } catch {
+        window.history.pushState(null, '', path);
+      }
+
+      // Pixel PageView
+      trackPageView(page.charAt(0).toUpperCase() + page.slice(1), path);
+    },
+    []
+  );
 
   // Find active product for product detail route
   const activeProduct =
     currentRoute === 'product'
-      ? products.find((p) => p.slug === routeParams.slug || p.id === routeParams.id) || products[0]
+      ? products.find((p) => p.slug === routeParams.slug || p.id === routeParams.id || p.sku === routeParams.slug) ||
+        products[0]
       : null;
 
   // Render Page Content
@@ -193,13 +305,13 @@ function MainApp() {
       case 'product':
         if (!activeProduct) {
           return (
-            <div className="py-20 text-center">
-              <p className="text-gray-500 text-sm">Product not found.</p>
+            <div className="py-20 text-center space-y-3">
+              <p className="text-gray-500 text-sm font-medium">Product not found.</p>
               <button
                 onClick={() => handleNavigate('shop')}
-                className="mt-4 px-4 py-2 bg-[#F5A623] text-black font-bold rounded-xl text-xs"
+                className="px-5 py-2.5 bg-[#F5A623] text-black font-bold rounded-xl text-xs"
               >
-                Return to Shop
+                Return to All Products
               </button>
             </div>
           );
@@ -365,7 +477,7 @@ function MainApp() {
         />
       )}
 
-      {/* Fixed Bottom Mobile Navigation Bar (Section 14 & Reference Screenshot) */}
+      {/* Fixed Bottom Mobile Navigation Bar */}
       {!isAdminView && (
         <MobileBottomBar
           currentRoute={currentRoute}
@@ -383,7 +495,7 @@ function MainApp() {
               clearToast();
               handleNavigate('cart');
             }}
-            className="text-[#F5A623] font-bold hover:underline"
+            className="text-[#F5A623] font-bold hover:underline cursor-pointer"
           >
             View Cart
           </button>

@@ -33,6 +33,10 @@ import {
   Receipt,
   Flame,
   Sliders,
+  Link as LinkIcon,
+  Globe,
+  Share2,
+  Copy,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { Product, Category, Order, OrderStatus, PaymentStatus, StoreSettings, AdminRole, PixelSettings, HeroAdSlide } from '../../types';
@@ -56,6 +60,8 @@ import { PagesCmsTab } from './PagesCmsTab';
 import { PixelSettingsCard } from './PixelSettingsCard';
 import { OfflinePosModal } from './OfflinePosModal';
 import { ProfitReportsTab } from './ProfitReportsTab';
+import { AdLinksCampaignTab } from './AdLinksCampaignTab';
+import { generateShareUrl } from '../../services/pixelService';
 
 interface AdminDashboardProps {
   products: Product[];
@@ -66,7 +72,7 @@ interface AdminDashboardProps {
   onNavigate: (page: string, params?: Record<string, any>) => void;
 }
 
-type TabType = 'overview' | 'products' | 'categories' | 'orders' | 'profit-reports' | 'pages-cms' | 'staff' | 'settings';
+type TabType = 'overview' | 'products' | 'categories' | 'orders' | 'profit-reports' | 'pages-cms' | 'staff' | 'settings' | 'ad-links';
 
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   products,
@@ -81,16 +87,16 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   // Role permissions:
   // - overall_admin: all tabs
-  // - store_keeper: overview, products, categories, profit-reports
+  // - store_keeper: overview, products, categories, profit-reports, ad-links
   // - order_dispatcher: overview, orders
   const allowedTabs = useMemo(() => {
     if (adminRole === 'store_keeper') {
-      return ['overview', 'products', 'categories', 'profit-reports'] as TabType[];
+      return ['overview', 'products', 'categories', 'profit-reports', 'ad-links'] as TabType[];
     }
     if (adminRole === 'order_dispatcher') {
       return ['overview', 'orders'] as TabType[];
     }
-    return ['overview', 'products', 'categories', 'orders', 'profit-reports', 'pages-cms', 'staff', 'settings'] as TabType[];
+    return ['overview', 'products', 'categories', 'orders', 'profit-reports', 'pages-cms', 'staff', 'settings', 'ad-links'] as TabType[];
   }, [adminRole]);
 
   // Safety fallback if active tab not allowed
@@ -133,6 +139,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   );
   const [supportEmail, setSupportEmail] = useState(settings.supportEmail);
   const [supportPhone, setSupportPhone] = useState(settings.supportPhone);
+  const [customDomain, setCustomDomain] = useState<string>(settings.customDomain || 'https://www.boricart.com.ng');
 
   // Announcement Bar Messages
   const [announcements, setAnnouncements] = useState<string[]>(

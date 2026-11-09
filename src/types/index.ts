@@ -136,6 +136,17 @@ export interface Order {
   salesChannel?: 'online_store' | 'walk_in' | 'offline_pos' | 'direct_whatsapp' | 'exhibition';
   cashierName?: string;
   notes?: string;
+
+  // Ad Tracking & Attribution (Facebook, TikTok, Google)
+  utmSource?: string;
+  utmMedium?: string;
+  utmCampaign?: string;
+  utmContent?: string;
+  utmTerm?: string;
+  fbclid?: string;
+  ttclid?: string;
+  gclid?: string;
+
   createdAt: string;
   updatedAt: string;
 }
@@ -254,6 +265,7 @@ export interface StoreSettings {
   heroAutoScrollInterval?: number; // Auto-scroll interval in seconds (default: 5)
   pagesContent?: Partial<SitePagesContent>;
   pixels?: PixelSettings;
+  customDomain?: string; // e.g. "https://www.boricart.com.ng"
   updatedAt: string;
 }
 

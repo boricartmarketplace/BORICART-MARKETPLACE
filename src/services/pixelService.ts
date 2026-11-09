@@ -24,6 +24,121 @@ export interface FiredPixelEvent {
   data?: Record<string, any>;
 }
 
+export interface AdAttribution {
+  utmSource?: string;
+  utmMedium?: string;
+  utmCampaign?: string;
+  utmContent?: string;
+  utmTerm?: string;
+  fbclid?: string;
+  ttclid?: string;
+  gclid?: string;
+  landingUrl?: string;
+  referrer?: string;
+  capturedAt?: string;
+}
+
+const STORAGE_KEY_ATTRIBUTION = 'boricart_ad_attribution';
+
+/**
+ * Capture UTM and ad click tracking parameters from URL on entry
+ */
+export function captureAdAttribution(): AdAttribution | null {
+  if (typeof window === 'undefined') return null;
+
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const utmSource = params.get('utm_source');
+    const utmMedium = params.get('utm_medium');
+    const utmCampaign = params.get('utm_campaign');
+    const utmContent = params.get('utm_content');
+    const utmTerm = params.get('utm_term');
+    const fbclid = params.get('fbclid');
+    const ttclid = params.get('ttclid');
+    const gclid = params.get('gclid');
+
+    // Only update attribution if at least one parameter is present
+    if (utmSource || utmCampaign || fbclid || ttclid || gclid) {
+      const attribution: AdAttribution = {
+        utmSource: utmSource || undefined,
+        utmMedium: utmMedium || undefined,
+        utmCampaign: utmCampaign || undefined,
+        utmContent: utmContent || undefined,
+        utmTerm: utmTerm || undefined,
+        fbclid: fbclid || undefined,
+        ttclid: ttclid || undefined,
+        gclid: gclid || undefined,
+        landingUrl: window.location.href,
+        referrer: document.referrer || undefined,
+        capturedAt: new Date().toISOString(),
+      };
+
+      sessionStorage.setItem(STORAGE_KEY_ATTRIBUTION, JSON.stringify(attribution));
+      localStorage.setItem(STORAGE_KEY_ATTRIBUTION, JSON.stringify(attribution));
+      return attribution;
+    }
+
+    return getAdAttribution();
+  } catch (e) {
+    return null;
+  }
+}
+
+/**
+ * Retrieve current visitor ad attribution for order records and pixel matching
+ */
+export function getAdAttribution(): AdAttribution | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = sessionStorage.getItem(STORAGE_KEY_ATTRIBUTION) || localStorage.getItem(STORAGE_KEY_ATTRIBUTION);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Helper to build trackable ads campaign links pointing to the custom domain
+ * (e.g. https://www.boricart.com.ng/product/mold-remover-gel?utm_source=facebook&utm_campaign=black_friday)
+ */
+export function generateShareUrl(
+  path: string,
+  options?: {
+    customDomain?: string;
+    campaignPlatform?: 'facebook' | 'tiktok' | 'google' | 'pinterest' | 'whatsapp' | 'clean';
+    campaignName?: string;
+    adContent?: string;
+  }
+): string {
+  const baseDomain = options?.customDomain?.replace(/\/$/, '') || 'https://www.boricart.com.ng';
+  const cleanPath = path.startsWith('/') ? path : `/${path}`;
+
+  try {
+    const fullUrl = new URL(`${baseDomain}${cleanPath}`);
+
+    if (options?.campaignPlatform && options.campaignPlatform !== 'clean') {
+      const platform = options.campaignPlatform;
+      fullUrl.searchParams.set('utm_source', platform);
+      fullUrl.searchParams.set(
+        'utm_medium',
+        platform === 'google' ? 'cpc' : platform === 'whatsapp' ? 'direct_chat' : 'paid_social'
+      );
+      if (options.campaignName) {
+        fullUrl.searchParams.set('utm_campaign', options.campaignName);
+      } else {
+        fullUrl.searchParams.set('utm_campaign', 'sales_conversion');
+      }
+      if (options.adContent) {
+        fullUrl.searchParams.set('utm_content', options.adContent);
+      }
+    }
+
+    return fullUrl.toString();
+  } catch {
+    return `${baseDomain}${cleanPath}`;
+  }
+}
+
 // In-memory event log for Admin verification & test console
 const firedEventsLog: FiredPixelEvent[] = [];
 type EventListener = (event: FiredPixelEvent) => void;

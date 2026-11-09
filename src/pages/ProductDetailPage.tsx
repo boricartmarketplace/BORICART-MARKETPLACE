@@ -21,6 +21,8 @@ import {
   UserCheck,
   MapPin,
   Eye,
+  Share2,
+  Copy,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { Product, ProductReview, ProductFaq } from '../types';
@@ -29,7 +31,7 @@ import { useCart } from '../context/CartContext';
 import { useWishlist } from '../context/WishlistContext';
 import { WhatsAppButton } from '../components/common/WhatsAppButton';
 import { NIGERIAN_STATES } from '../data/initialCatalog';
-import { trackViewContent } from '../services/pixelService';
+import { trackViewContent, trackPurchase, getAdAttribution, generateShareUrl } from '../services/pixelService';
 
 interface ProductDetailPageProps {
   product: Product;
@@ -51,6 +53,7 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
   const [selectedImage, setSelectedImage] = useState<string>(product.mainImage);
   const [quantity, setQuantity] = useState<number>(1);
   const [activeFaq, setActiveFaq] = useState<number | null>(0);
+  const [copiedLink, setCopiedLink] = useState(false);
 
   // Live Countdown Timer state
   const timerHoursInitial = product.timerHours || 24;
@@ -248,6 +251,8 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
 
     setIsSubmittingOrder(true);
     try {
+      const attribution = getAdAttribution();
+
       const orderPayload = {
         customerName: orderForm.fullName.trim(),
         phone: orderForm.phone.trim(),
@@ -269,9 +274,20 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
         deliveryFee: currentDeliveryFee,
         totalAmount: totalAmountDue,
         notes: orderForm.notes.trim() || undefined,
+        utmSource: attribution?.utmSource,
+        utmMedium: attribution?.utmMedium,
+        utmCampaign: attribution?.utmCampaign,
+        utmContent: attribution?.utmContent,
+        utmTerm: attribution?.utmTerm,
+        fbclid: attribution?.fbclid,
+        ttclid: attribution?.ttclid,
+        gclid: attribution?.gclid,
       };
 
       const savedOrder = await createOrder(orderPayload);
+
+      // Trigger Pixel Purchase Event across Facebook, Google, TikTok, and Pinterest
+      trackPurchase(savedOrder);
 
       try {
         confetti({
@@ -343,9 +359,41 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
             <ArrowLeft className="w-3.5 h-3.5" />
             <span>Back to Catalog</span>
           </button>
-          <div className="flex items-center gap-2">
-            <span className="text-gray-400">Category:</span>
-            <span className="font-extrabold text-gray-900">{product.categoryName}</span>
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1.5">
+              <span className="text-gray-400">Category:</span>
+              <button
+                onClick={() => onNavigate('category', { categoryId: product.categoryId, slug: product.categoryId })}
+                className="font-extrabold text-gray-900 hover:text-[#F5A623] hover:underline cursor-pointer"
+              >
+                {product.categoryName}
+              </button>
+            </div>
+
+            <button
+              onClick={() => {
+                const url = generateShareUrl(`/product/${product.slug}`);
+                if (navigator.clipboard) {
+                  navigator.clipboard.writeText(url);
+                  setCopiedLink(true);
+                  setTimeout(() => setCopiedLink(false), 2500);
+                }
+              }}
+              title="Copy official shareable link"
+              className="flex items-center gap-1 px-2.5 py-1 bg-white hover:bg-amber-50 border border-gray-200 hover:border-[#F5A623] text-gray-700 hover:text-[#D98200] rounded-lg font-bold text-[11px] transition-colors cursor-pointer"
+            >
+              {copiedLink ? (
+                <>
+                  <Check className="w-3.5 h-3.5 text-emerald-600" />
+                  <span className="text-emerald-700">Link Copied!</span>
+                </>
+              ) : (
+                <>
+                  <Share2 className="w-3.5 h-3.5" />
+                  <span>Share Link</span>
+                </>
+              )}
+            </button>
           </div>
         </div>
       </div>

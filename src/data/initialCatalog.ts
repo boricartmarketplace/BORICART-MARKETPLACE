@@ -588,9 +588,10 @@ export const DEFAULT_PAGES_CONTENT = {
 };
 
 export const DEFAULT_SETTINGS: StoreSettings = {
+  customDomain: 'https://www.boricart.com.ng',
   whatsappNumber: '+2348140008921',
   storeName: 'BORICART',
-  supportEmail: 'support@boricart.com',
+  supportEmail: 'support@boricart.com.ng',
   supportPhone: '+234 814 000 8921',
   officeAddress: '14 Admiralty Way, Lekki Phase 1, Lagos, Nigeria',
   deliveryFee: 2500,
