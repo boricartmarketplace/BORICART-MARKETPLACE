@@ -29,6 +29,9 @@ export interface Product {
   status: 'draft' | 'published';
   isFeatured: boolean;
   isBestSeller: boolean;
+  showInHeroAds?: boolean; // Display this product in the rotating Hero Ads section
+  heroAdBadge?: string; // Optional custom promotional badge (e.g., "HOT DEAL • 25% OFF")
+  heroAdHeadline?: string; // Optional custom advertising headline for hero banner
   rating?: number;
   reviewCount?: number;
   createdAt: string;
@@ -182,6 +185,23 @@ export interface PixelSettings {
   testMode?: boolean;
 }
 
+export interface HeroAdSlide {
+  id: string;
+  productId?: string;
+  badge?: string;
+  headline: string;
+  subhead?: string;
+  description: string;
+  buttonText?: string;
+  image: string;
+  price?: number;
+  originalPrice?: number;
+  discountPercentage?: number;
+  backgroundColor?: string;
+  isActive: boolean;
+  sortOrder?: number;
+}
+
 export interface StoreSettings {
   whatsappNumber: string;
   storeName: string;
@@ -200,6 +220,9 @@ export interface StoreSettings {
   heroSubhead?: string;
   heroDescription?: string;
   heroButtonText?: string;
+  heroAdsSlides?: HeroAdSlide[]; // Custom or product promotional ad slides
+  heroSelectedProductIds?: string[]; // IDs of products explicitly selected by admin to rotate in Hero Ads
+  heroAutoScrollInterval?: number; // Auto-scroll interval in seconds (default: 5)
   pagesContent?: Partial<SitePagesContent>;
   pixels?: PixelSettings;
   updatedAt: string;

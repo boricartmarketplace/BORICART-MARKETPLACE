@@ -45,6 +45,9 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
   const [status, setStatus] = useState<'draft' | 'published'>('published');
   const [isFeatured, setIsFeatured] = useState(false);
   const [isBestSeller, setIsBestSeller] = useState(false);
+  const [showInHeroAds, setShowInHeroAds] = useState(false);
+  const [heroAdBadge, setHeroAdBadge] = useState('');
+  const [heroAdHeadline, setHeroAdHeadline] = useState('');
   const [productType, setProductType] = useState<'physical' | 'digital' | 'bundle' | 'service'>('physical');
   const [costPrice, setCostPrice] = useState<number | ''>('');
   const [adSpend, setAdSpend] = useState<number | ''>('');
@@ -77,6 +80,9 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
       setStatus(product.status);
       setIsFeatured(product.isFeatured);
       setIsBestSeller(product.isBestSeller);
+      setShowInHeroAds(Boolean(product.showInHeroAds));
+      setHeroAdBadge(product.heroAdBadge || '');
+      setHeroAdHeadline(product.heroAdHeadline || '');
       setProductType(product.productType || 'physical');
       setCostPrice(product.costPrice ?? '');
       setAdSpend(product.adSpend ?? '');
@@ -106,6 +112,9 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
       setStatus('published');
       setIsFeatured(false);
       setIsBestSeller(false);
+      setShowInHeroAds(false);
+      setHeroAdBadge('');
+      setHeroAdHeadline('');
       setImages([]);
       setMainImage('');
     }
@@ -224,6 +233,9 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
         status,
         isFeatured,
         isBestSeller,
+        showInHeroAds,
+        heroAdBadge: heroAdBadge.trim() || undefined,
+        heroAdHeadline: heroAdHeadline.trim() || undefined,
         productType,
         costPrice: costPrice !== '' ? Number(costPrice) : 0,
         adSpend: adSpend !== '' ? Number(adSpend) : 0,
@@ -708,6 +720,48 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                   <span>Mark as Best-Seller</span>
                 </label>
               </div>
+            </div>
+
+            {/* HERO ADS SPOTLIGHT TOGGLE */}
+            <div className="p-4 bg-amber-50/70 border border-amber-200/90 rounded-2xl space-y-3">
+              <label className="flex items-center gap-2.5 cursor-pointer text-xs font-black text-[#D98200]">
+                <input
+                  type="checkbox"
+                  checked={showInHeroAds}
+                  onChange={(e) => setShowInHeroAds(e.target.checked)}
+                  className="rounded accent-[#F5A623] w-4 h-4"
+                />
+                <span>Feature in Homepage Hero Ads Section (Auto-Scrolling Spotlight)</span>
+              </label>
+
+              {showInHeroAds && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+                  <div>
+                    <label className="block text-[11px] font-bold text-gray-700 mb-1">
+                      Promotional Ad Badge (e.g. HOT DEAL • 20% OFF)
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. HOT DEAL • 20% OFF or BEST SELLER"
+                      value={heroAdBadge}
+                      onChange={(e) => setHeroAdBadge(e.target.value)}
+                      className="w-full text-xs bg-white border border-amber-300 rounded-xl px-3 py-2 focus:outline-none focus:border-[#F5A623]"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-bold text-gray-700 mb-1">
+                      Hero Headline Hook (Optional)
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Catchy advertising title for the slider"
+                      value={heroAdHeadline}
+                      onChange={(e) => setHeroAdHeadline(e.target.value)}
+                      className="w-full text-xs bg-white border border-amber-300 rounded-xl px-3 py-2 focus:outline-none focus:border-[#F5A623]"
+                    />
+                  </div>
+                </div>
+              )}
             </div>
           </form>
 

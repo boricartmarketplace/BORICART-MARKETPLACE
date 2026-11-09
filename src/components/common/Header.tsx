@@ -279,19 +279,21 @@ export const Header: React.FC<HeaderProps> = ({
               </button>
 
               {accountDropdownOpen && (
-                <div className="absolute right-0 top-full mt-2 w-48 bg-white rounded-2xl shadow-xl border border-gray-100 py-2 z-50 text-xs font-semibold">
-                  <button
-                    onClick={() => {
-                      setAccountDropdownOpen(false);
-                      onNavigate(isAdmin ? 'admin-dashboard' : 'admin-login');
-                    }}
-                    className="w-full text-left px-4 py-2 hover:bg-amber-50 text-gray-800 hover:text-[#F5A623] transition-colors flex items-center justify-between"
-                  >
-                    <span>{isAdmin ? 'Admin Dashboard' : 'Admin Login'}</span>
-                    <span className="text-[10px] bg-amber-100 text-[#D98200] px-1.5 py-0.5 rounded font-bold">
-                      Staff
-                    </span>
-                  </button>
+                <div className="absolute right-0 top-full mt-2 w-52 bg-white rounded-2xl shadow-xl border border-gray-100 py-2 z-50 text-xs font-semibold">
+                  {isAdmin && (
+                    <button
+                      onClick={() => {
+                        setAccountDropdownOpen(false);
+                        onNavigate('admin-dashboard');
+                      }}
+                      className="w-full text-left px-4 py-2 hover:bg-amber-50 text-gray-800 hover:text-[#F5A623] transition-colors flex items-center justify-between border-b border-gray-100 mb-1"
+                    >
+                      <span className="font-bold text-[#D98200]">Admin Dashboard</span>
+                      <span className="text-[10px] bg-amber-100 text-[#D98200] px-1.5 py-0.5 rounded font-bold">
+                        Active Staff
+                      </span>
+                    </button>
+                  )}
                   <button
                     onClick={() => {
                       setAccountDropdownOpen(false);
@@ -304,11 +306,29 @@ export const Header: React.FC<HeaderProps> = ({
                   <button
                     onClick={() => {
                       setAccountDropdownOpen(false);
+                      onNavigate('delivery-policy');
+                    }}
+                    className="w-full text-left px-4 py-2 hover:bg-amber-50 text-gray-800 hover:text-[#F5A623] transition-colors"
+                  >
+                    Delivery & Returns Policy
+                  </button>
+                  <button
+                    onClick={() => {
+                      setAccountDropdownOpen(false);
                       onNavigate('contact');
                     }}
                     className="w-full text-left px-4 py-2 hover:bg-amber-50 text-gray-800 hover:text-[#F5A623] transition-colors"
                   >
-                    Help & Support
+                    Help & WhatsApp Support
+                  </button>
+                  <button
+                    onClick={() => {
+                      setAccountDropdownOpen(false);
+                      onNavigate('about');
+                    }}
+                    className="w-full text-left px-4 py-2 hover:bg-amber-50 text-gray-800 hover:text-[#F5A623] transition-colors"
+                  >
+                    About Boricart
                   </button>
                 </div>
               )}
@@ -573,17 +593,19 @@ export const Header: React.FC<HeaderProps> = ({
               </div>
             </div>
 
-            <div className="pt-6 border-t border-gray-100 space-y-2">
-              <button
-                onClick={() => {
-                  setMobileMenuOpen(false);
-                  onNavigate(isAdmin ? 'admin-dashboard' : 'admin-login');
-                }}
-                className="w-full text-center text-xs font-bold text-gray-600 hover:text-black py-2"
-              >
-                {isAdmin ? 'Admin Dashboard' : 'Admin Portal Login'}
-              </button>
-            </div>
+            {isAdmin && (
+              <div className="pt-6 border-t border-gray-100 space-y-2">
+                <button
+                  onClick={() => {
+                    setMobileMenuOpen(false);
+                    onNavigate('admin-dashboard');
+                  }}
+                  className="w-full text-center text-xs font-bold text-[#D98200] bg-amber-50 py-2.5 rounded-xl border border-amber-200"
+                >
+                  Go to Admin Dashboard
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}

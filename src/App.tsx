@@ -80,11 +80,47 @@ function MainApp() {
     trackPageView('Home', '/');
   }, [isAdmin]);
 
+  // Check URL hash/parameters for direct dedicated link to admin portal (#admin, #dashboard, ?admin=true)
+  useEffect(() => {
+    const checkAdminUrl = () => {
+      const hash = window.location.hash.toLowerCase();
+      const search = window.location.search.toLowerCase();
+      const pathname = window.location.pathname.toLowerCase();
+
+      if (
+        hash === '#admin' ||
+        hash === '#dashboard' ||
+        hash === '#admin-login' ||
+        hash === '#admin-dashboard' ||
+        search.includes('admin') ||
+        pathname.endsWith('/admin')
+      ) {
+        setCurrentRoute(isAdmin ? 'admin-dashboard' : 'admin-login');
+      }
+    };
+
+    checkAdminUrl();
+    window.addEventListener('hashchange', checkAdminUrl);
+    return () => window.removeEventListener('hashchange', checkAdminUrl);
+  }, [isAdmin]);
+
   // Navigate handler
   const handleNavigate = (page: string, params: Record<string, any> = {}) => {
     setCurrentRoute(page);
     setRouteParams(params);
     window.scrollTo({ top: 0, behavior: 'smooth' });
+
+    // Keep URL hash in sync for private dashboard link
+    if (page === 'admin-dashboard' || page === 'admin-login') {
+      if (window.location.hash !== '#admin') {
+        window.history.replaceState(null, '', '#admin');
+      }
+    } else {
+      if (window.location.hash === '#admin') {
+        window.history.replaceState(null, '', window.location.pathname);
+      }
+    }
+
     trackPageView(page.charAt(0).toUpperCase() + page.slice(1), `/${page}`);
   };
 

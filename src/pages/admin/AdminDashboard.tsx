@@ -31,9 +31,12 @@ import {
   MessageSquare,
   BarChart3,
   Receipt,
+  Flame,
+  Sliders,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
-import { Product, Category, Order, OrderStatus, PaymentStatus, StoreSettings, AdminRole, PixelSettings } from '../../types';
+import { Product, Category, Order, OrderStatus, PaymentStatus, StoreSettings, AdminRole, PixelSettings, HeroAdSlide } from '../../types';
+import { HeroAdsSlider } from '../../components/home/HeroAdsSlider';
 import {
   formatNaira,
   saveProduct,
@@ -163,6 +166,33 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   );
   const [isUploadingHero, setIsUploadingHero] = useState<boolean>(false);
 
+  // Hero Ads & Products Carousel state
+  const [heroSelectedProductIds, setHeroSelectedProductIds] = useState<string[]>(
+    settings.heroSelectedProductIds || [
+      'bori-mold-remover-gel',
+      'bori-drain-blockage-remover',
+      'bori-motion-sensor-light',
+      'bori-nail-free-glue',
+    ]
+  );
+  const [heroAdsSlides, setHeroAdsSlides] = useState<HeroAdSlide[]>(
+    settings.heroAdsSlides || []
+  );
+  const [heroAutoScrollInterval, setHeroAutoScrollInterval] = useState<number>(
+    settings.heroAutoScrollInterval || 5
+  );
+  const [heroProductSearch, setHeroProductSearch] = useState<string>('');
+  const [isAddingCustomSlide, setIsAddingCustomSlide] = useState(false);
+  const [newSlideData, setNewSlideData] = useState<Partial<HeroAdSlide>>({
+    headline: '',
+    subhead: '',
+    badge: 'SPECIAL DEAL • 20% OFF',
+    description: '',
+    buttonText: 'Order Now',
+    image: '',
+    isActive: true,
+  });
+
   // Marketing & Tracking Pixels state
   const [pixels, setPixels] = useState<PixelSettings>(
     settings.pixels || {
@@ -204,6 +234,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         'Discover practical products designed to make everyday life easier, smarter and more convenient.'
     );
     setHeroButtonText(settings.heroButtonText || 'Shop Now');
+    if (settings.heroSelectedProductIds) {
+      setHeroSelectedProductIds(settings.heroSelectedProductIds);
+    }
+    if (settings.heroAdsSlides) {
+      setHeroAdsSlides(settings.heroAdsSlides);
+    }
+    if (settings.heroAutoScrollInterval) {
+      setHeroAutoScrollInterval(settings.heroAutoScrollInterval);
+    }
     if (settings.pixels) {
       setPixels(settings.pixels);
     }
@@ -336,7 +375,75 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     setAnnouncements((prev) => prev.filter((_, i) => i !== index));
   };
 
-  // Handle Settings Save (Delivery details, hero, support, announcements)
+  // Helper to toggle a product in Hero Ads
+  const toggleProductInHeroAds = async (productId: string) => {
+    const isCurrentlySelected = heroSelectedProductIds.includes(productId);
+    const updatedIds = isCurrentlySelected
+      ? heroSelectedProductIds.filter((id) => id !== productId)
+      : [...heroSelectedProductIds, productId];
+
+    setHeroSelectedProductIds(updatedIds);
+
+    // Sync product flag
+    const target = products.find((p) => p.id === productId);
+    if (target) {
+      await saveProduct({
+        ...target,
+        showInHeroAds: !isCurrentlySelected,
+      });
+      await onRefreshData();
+    }
+  };
+
+  // Add custom promotional ad slide
+  const handleAddCustomSlide = () => {
+    if (!newSlideData.headline?.trim()) {
+      alert('Please enter a headline for the promotional slide.');
+      return;
+    }
+
+    const slide: HeroAdSlide = {
+      id: `custom-slide-${Date.now()}`,
+      productId: newSlideData.productId,
+      badge: newSlideData.badge?.trim() || 'SPECIAL OFFER',
+      headline: newSlideData.headline.trim(),
+      subhead: newSlideData.subhead?.trim(),
+      description: newSlideData.description?.trim() || 'Discover this special offer from Boricart.',
+      buttonText: newSlideData.buttonText?.trim() || 'Order Now',
+      image: newSlideData.image?.trim() || heroImage,
+      price: newSlideData.price,
+      originalPrice: newSlideData.originalPrice,
+      discountPercentage: newSlideData.discountPercentage,
+      isActive: true,
+      sortOrder: heroAdsSlides.length + 1,
+    };
+
+    setHeroAdsSlides((prev) => [...prev, slide]);
+    setIsAddingCustomSlide(false);
+    setNewSlideData({
+      headline: '',
+      subhead: '',
+      badge: 'SPECIAL DEAL • 20% OFF',
+      description: '',
+      buttonText: 'Order Now',
+      image: '',
+      isActive: true,
+    });
+  };
+
+  // Delete custom slide
+  const handleDeleteCustomSlide = (slideId: string) => {
+    setHeroAdsSlides((prev) => prev.filter((s) => s.id !== slideId));
+  };
+
+  // Toggle active state of custom slide
+  const handleToggleCustomSlide = (slideId: string) => {
+    setHeroAdsSlides((prev) =>
+      prev.map((s) => (s.id === slideId ? { ...s, isActive: !s.isActive } : s))
+    );
+  };
+
+  // Handle Settings Save (Delivery details, hero, support, announcements, hero ads)
   const handleSaveSettings = async (e: React.FormEvent) => {
     e.preventDefault();
     await updateStoreSettings({
@@ -356,6 +463,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       heroSubhead,
       heroDescription,
       heroButtonText,
+      heroSelectedProductIds,
+      heroAdsSlides,
+      heroAutoScrollInterval: Number(heroAutoScrollInterval),
       pixels,
     });
     await onRefreshData();
@@ -899,13 +1009,19 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                   {prod.name}
                                 </p>
                                 <div className="flex items-center gap-1.5 mt-0.5">
+                                  {(prod.showInHeroAds || heroSelectedProductIds.includes(prod.id)) && (
+                                    <span className="bg-orange-100 text-[#D98200] text-[10px] font-bold px-1.5 py-0.5 rounded flex items-center gap-0.5">
+                                      <Flame className="w-2.5 h-2.5 fill-[#D98200]" />
+                                      Hero Ad
+                                    </span>
+                                  )}
                                   {prod.isFeatured && (
-                                    <span className="bg-amber-100 text-[#D98200] text-[10px] font-bold px-1.5 py-0.2 rounded">
+                                    <span className="bg-amber-100 text-[#D98200] text-[10px] font-bold px-1.5 py-0.5 rounded">
                                       Featured
                                     </span>
                                   )}
                                   {prod.isBestSeller && (
-                                    <span className="bg-gray-100 text-gray-700 text-[10px] font-bold px-1.5 py-0.2 rounded">
+                                    <span className="bg-gray-100 text-gray-700 text-[10px] font-bold px-1.5 py-0.5 rounded">
                                       Best Seller
                                     </span>
                                   )}
@@ -1247,83 +1363,439 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             )}
 
             <form onSubmit={handleSaveSettings} className="space-y-8">
-              {/* CARD 1: HERO SECTION CUSTOMIZATION */}
+              {/* CARD 1: HERO ADS & SCROLLING PRODUCTS SHOWCASE */}
               <div className="bg-white rounded-3xl border border-gray-100 p-6 sm:p-8 shadow-xs space-y-6">
-                <div className="flex items-center justify-between pb-4 border-b border-gray-100">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-gray-100 gap-3">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-2xl bg-amber-50 text-[#F5A623] flex items-center justify-center font-bold">
-                      <Layout className="w-5 h-5" />
+                      <Flame className="w-5 h-5 text-[#F5A623]" />
                     </div>
                     <div>
-                      <h4 className="font-extrabold text-base text-[#333333]">Hero Banner Customization</h4>
+                      <h4 className="font-extrabold text-base text-[#333333]">
+                        Hero Ads Section & Scrolling Products Showcase
+                      </h4>
                       <p className="text-xs text-gray-500">
-                        Update the hero image, headlines, and call-to-action button on the homepage.
+                        Determine which products scroll in the hero banner, add promotional ad slides, and adjust carousel rotation speed.
                       </p>
                     </div>
                   </div>
-                </div>
 
-                {/* Live Preview Card */}
-                <div>
-                  <label className="block text-xs font-bold text-gray-700 mb-2">
-                    Live Banner Preview
-                  </label>
-                  <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-[#FFF8EE] via-[#FFFBF6] to-[#FFF4E0] border border-amber-100/80 p-6 sm:p-8 shadow-xs">
-                    <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-center">
-                      <div className="md:col-span-7 space-y-3">
-                        <span className="inline-block px-3 py-1 bg-[#F5A623]/15 text-[#D98200] font-bold text-[10px] sm:text-xs rounded-full">
-                          {heroTagline || 'Welcome to Boricart'}
-                        </span>
-                        <h2 className="text-xl sm:text-3xl font-black text-[#333333] tracking-tight leading-tight">
-                          {heroHeadline || 'Everyday Solutions.'}
-                          <span className="block text-[#F5A623]">{heroSubhead || 'Better Living.'}</span>
-                        </h2>
-                        <p className="text-xs text-gray-600 line-clamp-2">
-                          {heroDescription || 'Discover practical products designed to make everyday life easier, smarter and more convenient.'}
-                        </p>
-                        <div>
-                          <button
-                            type="button"
-                            className="bg-[#F5A623] text-white font-bold text-xs px-5 py-2.5 rounded-xl shadow-xs pointer-events-none"
-                          >
-                            {heroButtonText || 'Shop Now'} →
-                          </button>
-                        </div>
-                      </div>
-
-                      <div className="md:col-span-5 flex justify-center">
-                        <div className="relative w-40 sm:w-48 aspect-[4/5] rounded-2xl overflow-hidden bg-amber-100/50 shadow-md border-2 border-white">
-                          <img
-                            src={heroImage || '/assets/aistudio/image_11326346.png'}
-                            alt="Hero Preview"
-                            className="w-full h-full object-cover object-top"
-                          />
-                        </div>
-                      </div>
-                    </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold text-gray-600">Auto-Scroll:</span>
+                    <select
+                      value={heroAutoScrollInterval}
+                      onChange={(e) => setHeroAutoScrollInterval(Number(e.target.value))}
+                      className="text-xs font-bold bg-gray-50 border border-gray-200 rounded-xl px-3 py-1.5 focus:outline-none focus:border-[#F5A623]"
+                    >
+                      <option value={3}>Every 3 seconds</option>
+                      <option value={4}>Every 4 seconds</option>
+                      <option value={5}>Every 5 seconds (Recommended)</option>
+                      <option value={7}>Every 7 seconds</option>
+                      <option value={10}>Every 10 seconds</option>
+                    </select>
                   </div>
                 </div>
 
-                {/* Hero Image Management */}
-                <div className="space-y-4 pt-2">
-                  <label className="block text-xs font-bold text-gray-700">
-                    Hero Section Image
-                  </label>
+                {/* 1. Live Interactive Ads Slider Preview */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-xs font-bold text-gray-700">
+                      Live Hero Ads Carousel Preview
+                    </label>
+                    <span className="text-[11px] text-gray-400">
+                      Hover to pause • Click arrows to test
+                    </span>
+                  </div>
+                  <div className="rounded-2xl overflow-hidden border border-amber-200/60 shadow-xs">
+                    <HeroAdsSlider
+                      products={products}
+                      settings={{
+                        ...settings,
+                        heroImage,
+                        heroTagline,
+                        heroHeadline,
+                        heroSubhead,
+                        heroDescription,
+                        heroButtonText,
+                        heroSelectedProductIds,
+                        heroAdsSlides,
+                        heroAutoScrollInterval,
+                      }}
+                      onNavigate={() => {}}
+                    />
+                  </div>
+                </div>
+
+                {/* 2. CHOOSE WHICH PRODUCTS TO DISPLAY IN THE HERO ADS SLIDER */}
+                <div className="space-y-4 pt-4 border-t border-gray-100">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div>
+                      <h5 className="font-bold text-sm text-gray-900 flex items-center gap-2">
+                        <ShoppingBag className="w-4 h-4 text-[#F5A623]" />
+                        <span>Select Products to Display in Hero Ads</span>
+                      </h5>
+                      <p className="text-xs text-gray-500">
+                        Check any product below to instantly feature it in the rotating hero ads showcase.
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-extrabold text-[#D98200] bg-amber-100 px-3 py-1 rounded-full">
+                        {heroSelectedProductIds.length} Products Active
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Search products filter */}
+                  <div className="relative">
+                    <input
+                      type="text"
+                      placeholder="Search catalog products to feature in Hero Ads..."
+                      value={heroProductSearch}
+                      onChange={(e) => setHeroProductSearch(e.target.value)}
+                      className="w-full text-xs bg-gray-50 border border-gray-200 rounded-xl pl-9 pr-4 py-2.5 focus:bg-white focus:outline-none focus:border-[#F5A623]"
+                    />
+                    <Search className="w-4 h-4 text-gray-400 absolute left-3 top-3" />
+                  </div>
+
+                  {/* Product Cards Selector Grid */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 max-h-72 overflow-y-auto p-1 border border-gray-100 rounded-2xl bg-gray-50/50">
+                    {products
+                      .filter((p) => {
+                        if (!heroProductSearch.trim()) return true;
+                        const q = heroProductSearch.toLowerCase();
+                        return (
+                          p.name.toLowerCase().includes(q) ||
+                          p.categoryName?.toLowerCase().includes(q) ||
+                          p.sku?.toLowerCase().includes(q)
+                        );
+                      })
+                      .map((p) => {
+                        const isSelected = heroSelectedProductIds.includes(p.id) || Boolean(p.showInHeroAds);
+                        return (
+                          <div
+                            key={p.id}
+                            onClick={() => toggleProductInHeroAds(p.id)}
+                            className={`p-3 rounded-xl border flex items-center gap-3 cursor-pointer transition-all ${
+                              isSelected
+                                ? 'bg-amber-50/90 border-[#F5A623] shadow-xs ring-1 ring-[#F5A623]'
+                                : 'bg-white border-gray-200 hover:border-gray-300'
+                            }`}
+                          >
+                            <img
+                              src={p.mainImage}
+                              alt={p.name}
+                              className="w-12 h-12 object-cover rounded-lg border border-gray-100 shrink-0"
+                            />
+                            <div className="flex-1 min-w-0">
+                              <p className="text-xs font-bold text-gray-900 truncate">
+                                {p.name}
+                              </p>
+                              <p className="text-[11px] text-gray-500">
+                                {formatNaira(p.promotionalPrice || p.regularPrice)}
+                              </p>
+                              <span
+                                className={`inline-block text-[9px] font-extrabold px-1.5 py-0.5 rounded mt-1 uppercase ${
+                                  isSelected
+                                    ? 'bg-[#F5A623] text-black'
+                                    : 'bg-gray-100 text-gray-600'
+                                }`}
+                              >
+                                {isSelected ? '✓ In Hero Ads' : '+ Add to Hero'}
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                  </div>
+                </div>
+
+                {/* 3. CUSTOM PROMOTIONAL AD SLIDES (CAMPAIGNS & FLASH DEALS) */}
+                <div className="space-y-4 pt-4 border-t border-gray-100">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h5 className="font-bold text-sm text-gray-900 flex items-center gap-2">
+                        <Sparkles className="w-4 h-4 text-[#F5A623]" />
+                        <span>Custom Promotional Ad Banners</span>
+                      </h5>
+                      <p className="text-xs text-gray-500">
+                        Create custom campaign slides with custom promotional headlines and discount badges.
+                      </p>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setIsAddingCustomSlide(!isAddingCustomSlide)}
+                      className="bg-[#1F1F1F] hover:bg-black text-white font-bold text-xs px-3.5 py-2 rounded-xl flex items-center gap-1.5 transition-colors cursor-pointer"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>{isAddingCustomSlide ? 'Cancel' : 'Create Custom Ad Slide'}</span>
+                    </button>
+                  </div>
+
+                  {/* Add slide form */}
+                  {isAddingCustomSlide && (
+                    <div className="p-4 bg-amber-50/80 border border-amber-200 rounded-2xl space-y-4 animate-in fade-in">
+                      <div className="flex items-center justify-between pb-2 border-b border-amber-200">
+                        <span className="text-xs font-black text-gray-900 uppercase">
+                          New Promotional Ad Slide
+                        </span>
+                        <span className="text-[11px] text-gray-500">
+                          Auto-populates from catalog or custom
+                        </span>
+                      </div>
+
+                      {/* Optional: Pick product to auto-fill */}
+                      <div>
+                        <label className="block text-xs font-bold text-gray-700 mb-1">
+                          Auto-Fill from Product (Optional)
+                        </label>
+                        <select
+                          value={newSlideData.productId || ''}
+                          onChange={(e) => {
+                            const pid = e.target.value;
+                            const prod = products.find((p) => p.id === pid);
+                            if (prod) {
+                              const disc =
+                                prod.promotionalPrice && prod.regularPrice > prod.promotionalPrice
+                                  ? Math.round(
+                                      ((prod.regularPrice - prod.promotionalPrice) /
+                                        prod.regularPrice) *
+                                        100
+                                    )
+                                  : undefined;
+                              setNewSlideData({
+                                ...newSlideData,
+                                productId: prod.id,
+                                headline: prod.name,
+                                subhead: prod.headline || prod.categoryName,
+                                badge: disc ? `HOT DEAL • ${disc}% OFF` : 'POPULAR SOLUTION',
+                                description: prod.shortDescription || prod.description.slice(0, 100),
+                                image: prod.mainImage,
+                                price: prod.promotionalPrice || prod.regularPrice,
+                                originalPrice: prod.promotionalPrice ? prod.regularPrice : undefined,
+                                discountPercentage: disc,
+                                buttonText: 'Order Now',
+                              });
+                            }
+                          }}
+                          className="w-full text-xs bg-white border border-gray-300 rounded-xl px-3 py-2 focus:outline-none focus:border-[#F5A623]"
+                        >
+                          <option value="">-- Select Product or Create Custom Slide --</option>
+                          {products.map((p) => (
+                            <option key={p.id} value={p.id}>
+                              {p.name} ({formatNaira(p.promotionalPrice || p.regularPrice)})
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-[11px] font-bold text-gray-700 mb-1">
+                            Ad Badge Pill (e.g. FLASH SALE • 25% OFF)
+                          </label>
+                          <input
+                            type="text"
+                            value={newSlideData.badge || ''}
+                            onChange={(e) =>
+                              setNewSlideData({ ...newSlideData, badge: e.target.value })
+                            }
+                            className="w-full text-xs bg-white border border-gray-300 rounded-xl px-3 py-2"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-[11px] font-bold text-gray-700 mb-1">
+                            Button Action Label
+                          </label>
+                          <input
+                            type="text"
+                            value={newSlideData.buttonText || ''}
+                            onChange={(e) =>
+                              setNewSlideData({ ...newSlideData, buttonText: e.target.value })
+                            }
+                            placeholder="Order Now"
+                            className="w-full text-xs bg-white border border-gray-300 rounded-xl px-3 py-2"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-[11px] font-bold text-gray-700 mb-1">
+                            Ad Headline
+                          </label>
+                          <input
+                            type="text"
+                            value={newSlideData.headline || ''}
+                            onChange={(e) =>
+                              setNewSlideData({ ...newSlideData, headline: e.target.value })
+                            }
+                            placeholder="e.g. Kitchen Mold Remover Gel"
+                            className="w-full text-xs bg-white border border-gray-300 rounded-xl px-3 py-2 font-bold"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-[11px] font-bold text-gray-700 mb-1">
+                            Ad Subtitle Hook
+                          </label>
+                          <input
+                            type="text"
+                            value={newSlideData.subhead || ''}
+                            onChange={(e) =>
+                              setNewSlideData({ ...newSlideData, subhead: e.target.value })
+                            }
+                            placeholder="e.g. Instant Stain Elimination"
+                            className="w-full text-xs bg-white border border-gray-300 rounded-xl px-3 py-2"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-[11px] font-bold text-gray-700 mb-1">
+                            Promotional Price in NGN
+                          </label>
+                          <input
+                            type="number"
+                            value={newSlideData.price || ''}
+                            onChange={(e) =>
+                              setNewSlideData({
+                                ...newSlideData,
+                                price: e.target.value ? Number(e.target.value) : undefined,
+                              })
+                            }
+                            placeholder="4500"
+                            className="w-full text-xs bg-white border border-gray-300 rounded-xl px-3 py-2"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-[11px] font-bold text-gray-700 mb-1">
+                            Image URL / Path
+                          </label>
+                          <input
+                            type="text"
+                            value={newSlideData.image || ''}
+                            onChange={(e) =>
+                              setNewSlideData({ ...newSlideData, image: e.target.value })
+                            }
+                            placeholder="https://... or /assets/..."
+                            className="w-full text-xs bg-white border border-gray-300 rounded-xl px-3 py-2"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-[11px] font-bold text-gray-700 mb-1">
+                          Ad Body Text
+                        </label>
+                        <textarea
+                          rows={2}
+                          value={newSlideData.description || ''}
+                          onChange={(e) =>
+                            setNewSlideData({ ...newSlideData, description: e.target.value })
+                          }
+                          placeholder="Short, high-converting commercial copy..."
+                          className="w-full text-xs bg-white border border-gray-300 rounded-xl p-2.5"
+                        />
+                      </div>
+
+                      <div className="flex justify-end gap-2 pt-2">
+                        <button
+                          type="button"
+                          onClick={() => setIsAddingCustomSlide(false)}
+                          className="px-4 py-2 border border-gray-300 rounded-xl text-xs font-bold text-gray-700 bg-white"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleAddCustomSlide}
+                          className="px-5 py-2 bg-[#F5A623] hover:bg-[#D98200] text-black font-extrabold rounded-xl text-xs shadow-xs"
+                        >
+                          Add Slide to Carousel
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* List of existing custom slides */}
+                  {heroAdsSlides.length > 0 && (
+                    <div className="space-y-2">
+                      {heroAdsSlides.map((slide, idx) => (
+                        <div
+                          key={slide.id || idx}
+                          className="p-3 bg-gray-50 border border-gray-200 rounded-xl flex items-center justify-between gap-3 text-xs"
+                        >
+                          <div className="flex items-center gap-3 min-w-0">
+                            <img
+                              src={slide.image}
+                              alt={slide.headline}
+                              className="w-12 h-12 object-cover rounded-lg border border-gray-200 shrink-0"
+                            />
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-1.5">
+                                <span className="font-bold text-gray-900 truncate">
+                                  {slide.headline}
+                                </span>
+                                {slide.badge && (
+                                  <span className="text-[10px] bg-amber-100 text-[#D98200] font-bold px-1.5 py-0.5 rounded">
+                                    {slide.badge}
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-[11px] text-gray-500 truncate">
+                                {slide.subhead || slide.description}
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2 shrink-0">
+                            <button
+                              type="button"
+                              onClick={() => handleToggleCustomSlide(slide.id)}
+                              className={`text-[10px] font-bold px-2 py-1 rounded-lg ${
+                                slide.isActive !== false
+                                  ? 'bg-emerald-100 text-emerald-800'
+                                  : 'bg-gray-200 text-gray-600'
+                              }`}
+                            >
+                              {slide.isActive !== false ? 'Active' : 'Paused'}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteCustomSlide(slide.id)}
+                              className="p-1.5 text-gray-400 hover:text-red-600 rounded-lg transition-colors"
+                              title="Delete Slide"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* 4. BASE BRAND LIFESTYLE BANNER PHOTO & COPY */}
+                <div className="space-y-4 pt-4 border-t border-gray-100">
+                  <h5 className="font-bold text-sm text-gray-900">
+                    Base Brand Lifestyle Slide Copy & Photo
+                  </h5>
 
                   <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
-                    <div className="w-24 h-28 rounded-2xl border-2 border-gray-100 overflow-hidden bg-gray-50 shrink-0 relative group">
+                    <div className="w-20 h-24 rounded-2xl border-2 border-gray-100 overflow-hidden bg-gray-50 shrink-0">
                       <img
                         src={heroImage}
-                        alt="Hero"
+                        alt="Brand Hero"
                         className="w-full h-full object-cover object-top"
                       />
                     </div>
 
-                    <div className="flex-1 space-y-3 w-full">
+                    <div className="flex-1 space-y-2 w-full">
                       <div className="flex flex-wrap items-center gap-2">
-                        <label className="cursor-pointer bg-white border border-gray-200 hover:border-[#F5A623] hover:text-[#F5A623] text-gray-700 text-xs font-bold px-4 py-2 rounded-xl flex items-center gap-2 shadow-2xs transition-colors">
-                          <Upload className="w-4 h-4" />
-                          <span>{isUploadingHero ? 'Uploading image...' : 'Upload New Image'}</span>
+                        <label className="cursor-pointer bg-white border border-gray-200 hover:border-[#F5A623] hover:text-[#F5A623] text-gray-700 text-xs font-bold px-3 py-1.5 rounded-xl flex items-center gap-1.5 shadow-2xs transition-colors">
+                          <Upload className="w-3.5 h-3.5" />
+                          <span>{isUploadingHero ? 'Uploading...' : 'Upload Image'}</span>
                           <input
                             type="file"
                             accept="image/*"
@@ -1336,103 +1808,70 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                         <button
                           type="button"
                           onClick={() => setHeroImage('/assets/aistudio/image_11326346.png')}
-                          className="bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 text-xs font-bold px-3 py-2 rounded-xl flex items-center gap-1.5 transition-colors"
+                          className="bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 text-xs font-bold px-3 py-1.5 rounded-xl transition-colors"
                         >
-                          <Sparkles className="w-3.5 h-3.5 text-[#F5A623]" />
-                          <span>Use Boy Portrait (Provided)</span>
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => setHeroImage('/assets/aistudio/image_58c04f55.png')}
-                          className="bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold px-3 py-2 rounded-xl flex items-center gap-1.5 transition-colors"
-                        >
-                          <ImageIcon className="w-3.5 h-3.5 text-gray-500" />
-                          <span>Use Couple Lifestyle</span>
+                          Use Boy Portrait (Provided)
                         </button>
                       </div>
 
-                      <div className="flex items-center gap-2">
-                        <input
-                          type="text"
-                          placeholder="Or paste an image URL or path (/assets/...)"
-                          value={heroImage}
-                          onChange={(e) => setHeroImage(e.target.value)}
-                          className="w-full text-xs bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 focus:bg-white focus:outline-none focus:border-[#F5A623]"
-                        />
-                      </div>
-                      <p className="text-[11px] text-gray-400">
-                        Supports local asset paths (e.g. <code>/assets/aistudio/image_11326346.png</code>) or any web image URL.
-                      </p>
+                      <input
+                        type="text"
+                        placeholder="Or enter direct image URL..."
+                        value={heroImage}
+                        onChange={(e) => setHeroImage(e.target.value)}
+                        className="w-full text-xs bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 focus:bg-white focus:outline-none focus:border-[#F5A623]"
+                      />
                     </div>
                   </div>
-                </div>
 
-                {/* Hero Text Customization Fields */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
-                  <div>
-                    <label className="block text-xs font-bold text-gray-700 mb-1">
-                      Welcome Tagline / Pill
-                    </label>
-                    <input
-                      type="text"
-                      value={heroTagline}
-                      onChange={(e) => setHeroTagline(e.target.value)}
-                      placeholder="Welcome to Boricart"
-                      className="w-full text-xs bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2.5 focus:bg-white focus:outline-none focus:border-[#F5A623]"
-                    />
-                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+                    <div>
+                      <label className="block text-[11px] font-bold text-gray-700 mb-1">
+                        Brand Pill Tagline
+                      </label>
+                      <input
+                        type="text"
+                        value={heroTagline}
+                        onChange={(e) => setHeroTagline(e.target.value)}
+                        className="w-full text-xs bg-gray-50 border border-gray-200 rounded-xl px-3 py-2"
+                      />
+                    </div>
 
-                  <div>
-                    <label className="block text-xs font-bold text-gray-700 mb-1">
-                      Call to Action Button Text
-                    </label>
-                    <input
-                      type="text"
-                      value={heroButtonText}
-                      onChange={(e) => setHeroButtonText(e.target.value)}
-                      placeholder="Shop Now"
-                      className="w-full text-xs bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2.5 focus:bg-white focus:outline-none focus:border-[#F5A623]"
-                    />
-                  </div>
+                    <div>
+                      <label className="block text-[11px] font-bold text-gray-700 mb-1">
+                        Brand Headline Line 1
+                      </label>
+                      <input
+                        type="text"
+                        value={heroHeadline}
+                        onChange={(e) => setHeroHeadline(e.target.value)}
+                        className="w-full text-xs bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 font-bold"
+                      />
+                    </div>
 
-                  <div>
-                    <label className="block text-xs font-bold text-gray-700 mb-1">
-                      Headline Line 1
-                    </label>
-                    <input
-                      type="text"
-                      value={heroHeadline}
-                      onChange={(e) => setHeroHeadline(e.target.value)}
-                      placeholder="Everyday Solutions."
-                      className="w-full text-xs bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2.5 focus:bg-white focus:outline-none focus:border-[#F5A623]"
-                    />
-                  </div>
+                    <div>
+                      <label className="block text-[11px] font-bold text-gray-700 mb-1">
+                        Brand Headline Line 2 (Orange)
+                      </label>
+                      <input
+                        type="text"
+                        value={heroSubhead}
+                        onChange={(e) => setHeroSubhead(e.target.value)}
+                        className="w-full text-xs bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 font-bold text-[#D98200]"
+                      />
+                    </div>
 
-                  <div>
-                    <label className="block text-xs font-bold text-gray-700 mb-1">
-                      Headline Line 2 (Orange Accent)
-                    </label>
-                    <input
-                      type="text"
-                      value={heroSubhead}
-                      onChange={(e) => setHeroSubhead(e.target.value)}
-                      placeholder="Better Living."
-                      className="w-full text-xs bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2.5 focus:bg-white focus:outline-none focus:border-[#F5A623]"
-                    />
-                  </div>
-
-                  <div className="sm:col-span-2">
-                    <label className="block text-xs font-bold text-gray-700 mb-1">
-                      Supporting Description
-                    </label>
-                    <textarea
-                      rows={2}
-                      value={heroDescription}
-                      onChange={(e) => setHeroDescription(e.target.value)}
-                      placeholder="Discover practical products designed to make everyday life easier, smarter and more convenient."
-                      className="w-full text-xs bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2.5 focus:bg-white focus:outline-none focus:border-[#F5A623]"
-                    />
+                    <div>
+                      <label className="block text-[11px] font-bold text-gray-700 mb-1">
+                        Button Label
+                      </label>
+                      <input
+                        type="text"
+                        value={heroButtonText}
+                        onChange={(e) => setHeroButtonText(e.target.value)}
+                        className="w-full text-xs bg-gray-50 border border-gray-200 rounded-xl px-3 py-2"
+                      />
+                    </div>
                   </div>
                 </div>
               </div>

@@ -80,17 +80,20 @@ export const MobileBottomBar: React.FC<MobileBottomBarProps> = ({
           <span>Wishlist</span>
         </button>
 
-        {/* 5. Account */}
+        {/* 5. Account / Help */}
         <button
-          onClick={() => onNavigate(isAdmin ? 'admin-dashboard' : 'admin-login')}
+          onClick={() => onNavigate(isAdmin ? 'admin-dashboard' : 'contact')}
           className={`flex flex-col items-center gap-0.5 py-1 transition-colors ${
-            currentRoute === 'admin-dashboard' || currentRoute === 'admin-login'
+            (isAdmin && currentRoute === 'admin-dashboard') || (!isAdmin && currentRoute === 'contact')
               ? 'text-[#F5A623]'
               : 'text-gray-500 hover:text-gray-800'
           }`}
         >
           <User className="w-5 h-5 stroke-[2.2]" />
-          <span>Account</span>
+          <span>{isAdmin ? 'Dashboard' : 'Support'}</span>
+          {((isAdmin && currentRoute === 'admin-dashboard') || (!isAdmin && currentRoute === 'contact')) && (
+            <span className="w-4 h-0.5 bg-[#F5A623] rounded-full mt-0.5" />
+          )}
         </button>
       </div>
     </div>

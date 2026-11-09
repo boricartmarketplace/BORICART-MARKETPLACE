@@ -26,6 +26,7 @@ import { ProductCard } from '../components/common/ProductCard';
 import { WhatsAppButton } from '../components/common/WhatsAppButton';
 import { BORICART_COLLECTIONS } from '../data/initialCatalog';
 import { formatNaira } from '../firebase/services';
+import { HeroAdsSlider } from '../components/home/HeroAdsSlider';
 
 interface HomePageProps {
   products: Product[];
@@ -43,16 +44,6 @@ export const HomePage: React.FC<HomePageProps> = ({
   whatsappNumber = '+2348140008921',
 }) => {
   const publishedProducts = products.filter((p) => p.status === 'published');
-
-  // Dynamic Hero Section fields from store settings
-  const heroImage = settings?.heroImage || '/assets/aistudio/image_11326346.png';
-  const heroTagline = settings?.heroTagline || 'Welcome to Boricart';
-  const heroHeadline = settings?.heroHeadline || 'Everyday Solutions.';
-  const heroSubhead = settings?.heroSubhead || 'Better Living.';
-  const heroDescription =
-    settings?.heroDescription ||
-    'Discover practical products designed to make everyday life easier, smarter and more convenient.';
-  const heroButtonText = settings?.heroButtonText || 'Shop Now';
 
   // Filter top sellers and featured
   const bestSellers = publishedProducts.filter((p) => p.isBestSeller);
@@ -74,68 +65,13 @@ export const HomePage: React.FC<HomePageProps> = ({
   return (
     <div className="space-y-10 sm:space-y-14 pb-20 sm:pb-24">
       {/* =========================================================================
-          1. HERO SECTION (Dynamically managed from Admin Dashboard)
+          1. HERO ADS & PRODUCTS SPOTLIGHT CAROUSEL (Scrolling Different Products & Promotional Deals)
          ========================================================================= */}
-      <section className="relative bg-[#FFF9F2] overflow-hidden border-b border-amber-100/60">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 pb-10 sm:pt-14 sm:pb-16">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
-            {/* Left Headline & Content */}
-            <div className="lg:col-span-6 space-y-4 sm:space-y-5 text-left z-10">
-              {/* "Welcome to Boricart" badge pill */}
-              <div className="inline-flex items-center gap-1.5 bg-[#FDE8C5] text-[#D98200] px-3.5 py-1 rounded-full text-xs font-bold tracking-tight">
-                <span>{heroTagline}</span>
-              </div>
-
-              {/* Main Headline */}
-              <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black text-[#111111] tracking-tight leading-[1.08]">
-                {heroHeadline} <br />
-                <span className="text-[#F5A623]">{heroSubhead}</span>
-              </h1>
-
-              {/* Supporting Text */}
-              <p className="text-sm sm:text-base text-gray-700 max-w-md leading-relaxed font-medium">
-                {heroDescription}
-              </p>
-
-              {/* Orange Shop Now Pill Button */}
-              <div className="pt-2">
-                <button
-                  onClick={() => onNavigate('shop')}
-                  className="bg-[#F5A623] hover:bg-[#D98200] text-black hover:text-white font-extrabold px-8 py-3.5 rounded-full shadow-md hover:shadow-lg transition-all inline-flex items-center gap-2 text-sm sm:text-base group"
-                >
-                  <span>{heroButtonText}</span>
-                  <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform stroke-[2.5]" />
-                </button>
-              </div>
-
-              {/* Slider Dots (from reference screenshot) */}
-              <div className="flex items-center gap-2 pt-4">
-                <span className="w-6 h-2 rounded-full bg-[#F5A623]" />
-                <span className="w-2 h-2 rounded-full bg-gray-300" />
-                <span className="w-2 h-2 rounded-full bg-gray-300" />
-                <span className="w-2 h-2 rounded-full bg-gray-300" />
-              </div>
-            </div>
-
-            {/* Right Hero Image (Selected image with clean frame and Cash on Delivery badge) */}
-            <div className="lg:col-span-6 relative flex justify-center lg:justify-end">
-              <div className="relative w-full max-w-md lg:max-w-lg aspect-[3/4] sm:aspect-[4/5] rounded-3xl overflow-hidden shadow-xl border-4 border-white bg-gradient-to-b from-amber-100/30 to-orange-100/20">
-                <img
-                  src={heroImage}
-                  alt={`${heroHeadline} ${heroSubhead} - Boricart`}
-                  className="w-full h-full object-cover object-top hover:scale-103 transition-transform duration-500"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent flex items-end p-5">
-                  <div className="bg-white/95 backdrop-blur-xs px-4 py-2 rounded-2xl shadow-sm text-xs font-bold text-gray-900 flex items-center gap-2">
-                    <ShieldCheck className="w-4 h-4 text-emerald-600" />
-                    <span>Nationwide Pay on Delivery • Inspect before payment</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
+      <HeroAdsSlider
+        products={publishedProducts}
+        settings={settings}
+        onNavigate={onNavigate}
+      />
 
       {/* =========================================================================
           2. SHOP BY CATEGORY SHORTCUTS (Horizontal row with soft cream cards)
