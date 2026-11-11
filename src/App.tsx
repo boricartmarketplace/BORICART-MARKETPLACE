@@ -436,11 +436,13 @@ function MainApp() {
   };
 
   const isAdminView = currentRoute === 'admin-dashboard';
+  const isProductSalesPageView = currentRoute === 'product';
+  const showStoreHeaderFooter = !isAdminView && !isProductSalesPageView;
 
   return (
     <div className="min-h-screen flex flex-col bg-white">
-      {/* Customer Header (Hidden in Admin Dashboard view) */}
-      {!isAdminView && (
+      {/* Customer Header (Hidden in Admin Dashboard and Product Sales Landing Page) */}
+      {showStoreHeaderFooter && (
         <Header
           categories={categories}
           products={products}
@@ -454,8 +456,8 @@ function MainApp() {
       {/* Main Content Area */}
       <main className="flex-1">{renderContent()}</main>
 
-      {/* Customer Footer (Hidden in Admin Dashboard view) */}
-      {!isAdminView && (
+      {/* Customer Footer (Hidden in Admin Dashboard and Product Sales Landing Page) */}
+      {showStoreHeaderFooter && (
         <Footer
           categories={categories}
           onNavigate={handleNavigate}
@@ -472,7 +474,7 @@ function MainApp() {
       />
 
       {/* Floating WhatsApp Support Button (Customer facing) */}
-      {!isAdminView && (
+      {showStoreHeaderFooter && (
         <WhatsAppButton
           phone={settings.whatsappNumber}
           variant="floating"
@@ -480,7 +482,7 @@ function MainApp() {
       )}
 
       {/* Fixed Bottom Mobile Navigation Bar */}
-      {!isAdminView && (
+      {showStoreHeaderFooter && (
         <MobileBottomBar
           currentRoute={currentRoute}
           onNavigate={handleNavigate}
