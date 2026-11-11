@@ -21,6 +21,7 @@ import {
 import { Product, Category, ProductReview, ProductFaq, ProductPackageOffer } from '../../types';
 import { slugify, uploadProductImage } from '../../firebase/services';
 import { generateSalesPageWithAI } from '../../services/aiSalesPageService';
+import { BORICART_COLLECTIONS } from '../../data/initialCatalog';
 
 interface ProductFormModalProps {
   product?: Product | null;
@@ -46,6 +47,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
   const [sku, setSku] = useState('');
   const [categoryId, setCategoryId] = useState('');
   const [categoryName, setCategoryName] = useState('');
+  const [collectionId, setCollectionId] = useState('');
   const [regularPrice, setRegularPrice] = useState<number | ''>('');
   const [promotionalPrice, setPromotionalPrice] = useState<number | ''>('');
   const [stockQuantity, setStockQuantity] = useState<number | ''>(10);
@@ -56,8 +58,8 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
   const [usageInstructions, setUsageInstructions] = useState('');
   const [tagsInput, setTagsInput] = useState('');
   const [status, setStatus] = useState<'draft' | 'published'>('published');
-  const [isFeatured, setIsFeatured] = useState(false);
-  const [isBestSeller, setIsBestSeller] = useState(false);
+  const [isFeatured, setIsFeatured] = useState(true);
+  const [isBestSeller, setIsBestSeller] = useState(true);
   const [showInHeroAds, setShowInHeroAds] = useState(false);
   const [heroAdBadge, setHeroAdBadge] = useState('');
   const [heroAdHeadline, setHeroAdHeadline] = useState('');
@@ -157,8 +159,9 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
       setUsageInstructions(product.usageInstructions || '');
       setTagsInput(product.tags?.join(', ') || '');
       setStatus(product.status);
-      setIsFeatured(product.isFeatured);
-      setIsBestSeller(product.isBestSeller);
+      setIsFeatured(product.isFeatured !== undefined ? product.isFeatured : true);
+      setIsBestSeller(product.isBestSeller !== undefined ? product.isBestSeller : true);
+      setCollectionId(product.collectionId || '');
       setShowInHeroAds(Boolean(product.showInHeroAds));
       setHeroAdBadge(product.heroAdBadge || '');
       setHeroAdHeadline(product.heroAdHeadline || '');
@@ -220,8 +223,9 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
       setUsageInstructions('');
       setTagsInput('');
       setStatus('published');
-      setIsFeatured(false);
-      setIsBestSeller(false);
+      setIsFeatured(true);
+      setIsBestSeller(true);
+      setCollectionId('');
       setShowInHeroAds(false);
       setHeroAdBadge('');
       setHeroAdHeadline('');
@@ -537,6 +541,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
         status,
         isFeatured,
         isBestSeller,
+        collectionId: collectionId.trim() || undefined,
         showInHeroAds,
         heroAdBadge: heroAdBadge.trim() || undefined,
         heroAdHeadline: heroAdHeadline.trim() || undefined,
@@ -813,6 +818,121 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                     onChange={(e) => setShortDescription(e.target.value)}
                     className="w-full text-sm bg-gray-50 border border-gray-200 rounded-xl p-3 focus:bg-white focus:outline-none focus:border-[#F5A623]"
                   />
+                </div>
+
+                {/* ================= STOREFRONT & HOMEPAGE VISIBILITY ================= */}
+                <div className="p-4 bg-gradient-to-r from-emerald-50 via-teal-50/50 to-green-50 rounded-2xl border-2 border-emerald-300 shadow-xs space-y-3">
+                  <div className="flex items-center justify-between pb-2 border-b border-emerald-200">
+                    <div className="flex items-center gap-2">
+                      <span className="w-6 h-6 rounded-lg bg-emerald-600 text-white font-black text-xs flex items-center justify-center">
+                        ⚡
+                      </span>
+                      <div>
+                        <h4 className="font-black text-sm text-gray-900">
+                          Storefront & Homepage Placement
+                        </h4>
+                        <p className="text-[11px] text-gray-600">
+                          Control how this product is pushed across the Boricart Homepage, Category pages & Collections.
+                        </p>
+                      </div>
+                    </div>
+                    <span className="text-[10px] font-black bg-emerald-200 text-emerald-950 px-2.5 py-0.5 rounded-full uppercase tracking-wider">
+                      Auto-Synced Live
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                    <label className="flex items-start gap-2.5 p-3 rounded-xl bg-white border border-emerald-200 cursor-pointer hover:border-emerald-400 transition-colors">
+                      <input
+                        type="checkbox"
+                        checked={isFeatured}
+                        onChange={(e) => setIsFeatured(e.target.checked)}
+                        className="rounded accent-emerald-600 w-4 h-4 mt-0.5"
+                      />
+                      <div>
+                        <span className="text-xs font-bold text-gray-900 block">
+                          Push to Homepage New Arrivals
+                        </span>
+                        <span className="text-[11px] text-gray-500 block leading-tight">
+                          Showcases in the top "New Arrivals & Fresh Innovations" grid with a NEW badge.
+                        </span>
+                      </div>
+                    </label>
+
+                    <label className="flex items-start gap-2.5 p-3 rounded-xl bg-white border border-emerald-200 cursor-pointer hover:border-emerald-400 transition-colors">
+                      <input
+                        type="checkbox"
+                        checked={isBestSeller}
+                        onChange={(e) => setIsBestSeller(e.target.checked)}
+                        className="rounded accent-emerald-600 w-4 h-4 mt-0.5"
+                      />
+                      <div>
+                        <span className="text-xs font-bold text-gray-900 block">
+                          Top Selling & Hot Deals
+                        </span>
+                        <span className="text-[11px] text-gray-500 block leading-tight">
+                          Displays in the Homepage "Top Selling Products" showcase.
+                        </span>
+                      </div>
+                    </label>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                    <div>
+                      <label className="block text-xs font-bold text-gray-700 mb-1">
+                        Homepage Collection Placement
+                      </label>
+                      <select
+                        value={collectionId}
+                        onChange={(e) => setCollectionId(e.target.value)}
+                        className="w-full text-xs font-semibold bg-white border border-emerald-200 rounded-xl px-3 py-2.5 focus:outline-none focus:border-emerald-500"
+                      >
+                        <option value="">Auto (Derived from product Category)</option>
+                        {BORICART_COLLECTIONS.map((col) => (
+                          <option key={col.id} value={col.id}>
+                            {col.name} {col.badge ? `(${col.badge})` : ''}
+                          </option>
+                        ))}
+                      </select>
+                      <p className="text-[10px] text-gray-500 mt-1">
+                        Pushes this item into the "Shop by Collection" visual gallery cards.
+                      </p>
+                    </div>
+
+                    <div className="p-2.5 rounded-xl bg-white border border-emerald-200">
+                      <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-gray-900 mb-1">
+                        <input
+                          type="checkbox"
+                          checked={showInHeroAds}
+                          onChange={(e) => setShowInHeroAds(e.target.checked)}
+                          className="rounded accent-emerald-600 w-4 h-4"
+                        />
+                        <span>Hero Rotating Banner Ad</span>
+                      </label>
+                      <p className="text-[10px] text-gray-500">
+                        Feature this product in the top auto-scrolling hero promotion.
+                      </p>
+
+                      {showInHeroAds && (
+                        <div className="space-y-1.5 mt-2 pt-2 border-t border-emerald-100">
+                          <input
+                            type="text"
+                            placeholder="Ad Badge: e.g. HOT DEAL • 30% OFF"
+                            value={heroAdBadge}
+                            onChange={(e) => setHeroAdBadge(e.target.value)}
+                            className="w-full text-xs bg-emerald-50/50 border border-emerald-200 rounded-lg px-2.5 py-1.5"
+                          />
+                          <input
+                            type="text"
+                            placeholder="Ad Headline Hook"
+                            value={heroAdHeadline}
+                            onChange={(e) => setHeroAdHeadline(e.target.value)}
+                            className="w-full text-xs bg-emerald-50/50 border border-emerald-200 rounded-lg px-2.5 py-1.5"
+                          />
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </div>
 
                 {/* ================= PRIMARY PRICING & DELIVERY MONEY CONFIGURATION ================= */}

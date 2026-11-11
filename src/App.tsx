@@ -193,7 +193,7 @@ function MainApp() {
     loadData();
   }, [isAdmin]);
 
-  // Listen to live customer order creation events across checkout & offline POS
+  // Listen to live events across store (orders, new products, deleted products)
   useEffect(() => {
     const handleOrderCreated = (event: Event) => {
       const customEvent = event as CustomEvent<Order>;
@@ -203,8 +203,19 @@ function MainApp() {
       loadData();
     };
 
+    const handleProductChanged = () => {
+      loadData();
+    };
+
     window.addEventListener('boricart:order_created', handleOrderCreated);
-    return () => window.removeEventListener('boricart:order_created', handleOrderCreated);
+    window.addEventListener('boricart:product_saved', handleProductChanged);
+    window.addEventListener('boricart:product_deleted', handleProductChanged);
+
+    return () => {
+      window.removeEventListener('boricart:order_created', handleOrderCreated);
+      window.removeEventListener('boricart:product_saved', handleProductChanged);
+      window.removeEventListener('boricart:product_deleted', handleProductChanged);
+    };
   }, []);
 
   // Parse initial route and capture UTM ad attribution from URL on boot

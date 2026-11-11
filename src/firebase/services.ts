@@ -228,6 +228,25 @@ export async function getProducts(onlyPublished = true): Promise<Product[]> {
       }
     });
 
+    // Merge any locally created uncommitted products from cache so new items appear immediately
+    const localCached = getLocalCache<Product[]>(STORAGE_KEY_PRODUCTS) || [];
+    localCached.forEach((lp) => {
+      if (
+        !products.some((p) => p.id === lp.id || (lp.slug && p.slug === lp.slug)) &&
+        !deletedIds.has(lp.id) &&
+        (!lp.slug || !deletedIds.has(lp.slug))
+      ) {
+        if (!onlyPublished || lp.status === 'published') {
+          products.unshift(lp);
+        }
+      }
+    });
+
+    // Sort with newly created products first so they appear front and center
+    products.sort(
+      (a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
+    );
+
     // Update local cache with non-deleted items only
     if (!onlyPublished) {
       setLocalCache(STORAGE_KEY_PRODUCTS, products);
@@ -343,9 +362,10 @@ export async function saveProduct(productData: Partial<Product> & { name: string
     specifications: productData.specifications || '',
     usageInstructions: productData.usageInstructions || '',
     status: productData.status || 'published',
-    isFeatured: Boolean(productData.isFeatured),
-    isBestSeller: Boolean(productData.isBestSeller),
+    isFeatured: productData.isFeatured !== undefined ? Boolean(productData.isFeatured) : true,
+    isBestSeller: productData.isBestSeller !== undefined ? Boolean(productData.isBestSeller) : true,
     showInHeroAds: Boolean(productData.showInHeroAds),
+    collectionId: productData.collectionId || undefined,
     heroAdBadge: productData.heroAdBadge || '',
     heroAdHeadline: productData.heroAdHeadline || '',
     rating: productData.rating || 5.0,
@@ -386,6 +406,18 @@ export async function saveProduct(productData: Partial<Product> & { name: string
     console.warn('Firestore write warning (persisted locally):', error);
   }
 
+  // 3. Immediately recalculate and sync category product counts
+  await syncCategoryProductCounts();
+
+  // 4. Dispatch event for instant UI sync across all open pages & components
+  try {
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('boricart:product_saved', { detail: productToSave }));
+    }
+  } catch (e) {
+    // ignore
+  }
+
   return productToSave;
 }
 
@@ -411,10 +443,46 @@ export async function deleteProduct(id: string): Promise<void> {
     console.warn('Firestore delete warning:', error);
   }
 
+  // 4. Sync category counts
+  await syncCategoryProductCounts();
+
   // Dispatch local event for instant UI sync
   try {
-    window.dispatchEvent(new CustomEvent('boricart:product_deleted', { detail: { id, slug } }));
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('boricart:product_deleted', { detail: { id, slug } }));
+    }
   } catch {
+    // ignore
+  }
+}
+
+export async function syncCategoryProductCounts(): Promise<void> {
+  try {
+    const products = getLocalCache<Product[]>(STORAGE_KEY_PRODUCTS) || [];
+    const categories = getLocalCache<Category[]>(STORAGE_KEY_CATEGORIES) || [...INITIAL_CATEGORIES];
+    const published = products.filter((p) => p.status === 'published');
+
+    const updatedCategories = categories.map((cat) => {
+      const count = published.filter(
+        (p) =>
+          p.categoryId === cat.id ||
+          p.categoryId === cat.slug ||
+          (p.categoryName && cat.name && p.categoryName.toLowerCase() === cat.name.toLowerCase())
+      ).length;
+      return { ...cat, productCount: count };
+    });
+
+    setLocalCache(STORAGE_KEY_CATEGORIES, updatedCategories);
+    for (const cat of updatedCategories) {
+      try {
+        await updateDoc(doc(db, CATEGORIES_COLLECTION, cat.id), {
+          productCount: cat.productCount,
+        });
+      } catch (e) {
+        // ignore
+      }
+    }
+  } catch (e) {
     // ignore
   }
 }

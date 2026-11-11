@@ -425,7 +425,7 @@ export const Header: React.FC<HeaderProps> = ({
                         >
                           <span>{cat.name}</span>
                           <span className="text-[10px] text-gray-400">
-                            {products.filter((p) => p.categoryId === cat.id && p.status === 'published').length}
+                            {products.filter((p) => (p.categoryId === cat.id || p.categoryId === cat.slug || (p.categoryName && p.categoryName.toLowerCase() === cat.name.toLowerCase())) && p.status === 'published').length}
                           </span>
                         </button>
                       ))}

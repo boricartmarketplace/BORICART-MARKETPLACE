@@ -338,7 +338,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       await onRefreshData();
       showActionNotice(
         'success',
-        `Product "${saved.name}" successfully ${productData.id ? 'updated' : 'added'}!`
+        `🚀 "${saved.name}" successfully saved and pushed to Homepage, Category pages & Shop catalog live!`
       );
     } catch (err: any) {
       console.error('Error saving product:', err);

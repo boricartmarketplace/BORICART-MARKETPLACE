@@ -58,9 +58,12 @@ export const ShopPage: React.FC<ShopPageProps> = ({
       .filter((p) => {
         // Category
         if (selectedCategory !== 'all') {
-          if (p.categoryId !== selectedCategory && p.categoryId !== activeCategoryObj?.id) {
-            return false;
-          }
+          const catMatches =
+            p.categoryId === selectedCategory ||
+            (activeCategoryObj && (p.categoryId === activeCategoryObj.id || p.categoryId === activeCategoryObj.slug)) ||
+            (activeCategoryObj && p.categoryName && p.categoryName.toLowerCase() === activeCategoryObj.name.toLowerCase()) ||
+            (p.categoryName && p.categoryName.toLowerCase().replace(/\s+/g, '-').includes(selectedCategory.toLowerCase()));
+          if (!catMatches) return false;
         }
         // Collection
         if (selectedCollection) {
@@ -95,7 +98,11 @@ export const ShopPage: React.FC<ShopPageProps> = ({
         const priceB = b.promotionalPrice || b.regularPrice;
         if (sortBy === 'price-asc') return priceA - priceB;
         if (sortBy === 'price-desc') return priceB - priceA;
-        if (sortBy === 'popular') return (b.reviewCount || 0) - (a.reviewCount || 0);
+        if (sortBy === 'popular') {
+          const revDiff = (b.reviewCount || 0) - (a.reviewCount || 0);
+          if (revDiff !== 0) return revDiff;
+          return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+        }
         return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
       });
   }, [
