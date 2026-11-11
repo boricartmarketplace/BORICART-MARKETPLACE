@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Boricart — Loading Page...</title>
+  <script>
+    // Single Page Application redirect script for static hosts (SPA fallback)
+    (function() {
+      var redirectPath = window.location.pathname + window.location.search + window.location.hash;
+      window.location.replace('/?redirect=' + encodeURIComponent(redirectPath));
+    })();
+  </script>
+</head>
+<body style="font-family: sans-serif; text-align: center; padding: 40px; color: #555;">
+  <p>Loading Boricart Everyday Solutions...</p>
+</body>
+</html>

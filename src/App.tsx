@@ -25,68 +25,122 @@ import {
   getOrders,
   getStoreSettings,
 } from './firebase/services';
-import { DEFAULT_SETTINGS } from './data/initialCatalog';
+import { DEFAULT_SETTINGS, INITIAL_PRODUCTS } from './data/initialCatalog';
 import { initPixels, trackPageView, captureAdAttribution } from './services/pixelService';
 
 // Parse initial route from URL path, query, or hash
 function parseRouteFromLocation(isAdminUser: boolean): { route: string; params: Record<string, any> } {
-  const pathname = window.location.pathname.toLowerCase();
-  const search = new URLSearchParams(window.location.search);
-  const hash = window.location.hash.toLowerCase();
+  let pathname = window.location.pathname;
+  let search = new URLSearchParams(window.location.search);
+  let hash = window.location.hash;
+
+  // 0. Handle SPA 404 static hosting redirect (?redirect=/product/slug)
+  if (search.has('redirect')) {
+    const rawRedirect = decodeURIComponent(search.get('redirect') || '');
+    if (rawRedirect) {
+      try {
+        const parsed = new URL(rawRedirect, window.location.origin);
+        pathname = parsed.pathname;
+        hash = parsed.hash;
+        search = parsed.searchParams;
+        window.history.replaceState(null, '', pathname + (parsed.search || '') + (hash || ''));
+      } catch {
+        if (rawRedirect.startsWith('/')) {
+          pathname = rawRedirect.split('?')[0].split('#')[0];
+          window.history.replaceState(null, '', rawRedirect);
+        }
+      }
+    }
+  }
+
+  const pLower = pathname.toLowerCase();
+  const hLower = hash.toLowerCase();
 
   // 1. Dedicated Admin Portal Links (/admin, /admin-login, /admin-dashboard, #admin, ?admin=true)
   if (
-    pathname === '/admin' ||
-    pathname.startsWith('/admin/') ||
-    pathname === '/admin-login' ||
-    pathname === '/admin-dashboard' ||
-    hash === '#admin' ||
-    hash === '#dashboard' ||
-    hash === '#admin-login' ||
-    hash === '#admin-dashboard' ||
+    pLower === '/admin' ||
+    pLower.startsWith('/admin/') ||
+    pLower === '/admin-login' ||
+    pLower === '/admin-dashboard' ||
+    hLower === '#admin' ||
+    hLower === '#dashboard' ||
+    hLower === '#admin-login' ||
+    hLower === '#admin-dashboard' ||
     search.has('admin')
   ) {
     return { route: isAdminUser ? 'admin-dashboard' : 'admin-login', params: {} };
   }
 
-  // 2. Product Sales Page Links (/product/:slug, #/product/:slug, ?product=:slug)
-  if (pathname.startsWith('/product/')) {
-    const slug = pathname.replace('/product/', '').split('/')[0].split('?')[0];
+  // 2. Product Sales Page Links (/product/:slug, /products/:slug, /p/:slug, #/product/:slug, ?product=:slug, ?p=:slug)
+  if (pLower.startsWith('/product/')) {
+    const rawSlug = pathname.slice('/product/'.length).split('/')[0].split('?')[0];
+    const slug = decodeURIComponent(rawSlug).trim();
     if (slug) return { route: 'product', params: { slug } };
   }
-  if (hash.startsWith('#/product/')) {
-    const slug = hash.replace('#/product/', '').split('/')[0].split('?')[0];
+  if (pLower.startsWith('/products/')) {
+    const rawSlug = pathname.slice('/products/'.length).split('/')[0].split('?')[0];
+    const slug = decodeURIComponent(rawSlug).trim();
+    if (slug) return { route: 'product', params: { slug } };
+  }
+  if (pLower.startsWith('/p/')) {
+    const rawSlug = pathname.slice('/p/'.length).split('/')[0].split('?')[0];
+    const slug = decodeURIComponent(rawSlug).trim();
+    if (slug) return { route: 'product', params: { slug } };
+  }
+  if (hLower.startsWith('#/product/')) {
+    const rawSlug = hash.slice('#/product/'.length).split('/')[0].split('?')[0];
+    const slug = decodeURIComponent(rawSlug).trim();
+    if (slug) return { route: 'product', params: { slug } };
+  }
+  if (hLower.startsWith('#/p/')) {
+    const rawSlug = hash.slice('#/p/'.length).split('/')[0].split('?')[0];
+    const slug = decodeURIComponent(rawSlug).trim();
     if (slug) return { route: 'product', params: { slug } };
   }
   if (search.has('product')) {
-    const slug = search.get('product') || '';
+    const slug = search.get('product')?.trim() || '';
+    if (slug) return { route: 'product', params: { slug } };
+  }
+  if (search.has('p')) {
+    const slug = search.get('p')?.trim() || '';
     if (slug) return { route: 'product', params: { slug } };
   }
 
-  // 3. Category Links (/category/:slug, #/category/:slug, ?category=:slug)
-  if (pathname.startsWith('/category/')) {
-    const slug = pathname.replace('/category/', '').split('/')[0].split('?')[0];
+  // 3. Category Links (/category/:slug, #/category/:slug, ?category=:slug, ?c=:slug)
+  if (pLower.startsWith('/category/')) {
+    const rawSlug = pathname.slice('/category/'.length).split('/')[0].split('?')[0];
+    const slug = decodeURIComponent(rawSlug).trim();
     if (slug) return { route: 'category', params: { categoryId: slug, slug } };
   }
-  if (hash.startsWith('#/category/')) {
-    const slug = hash.replace('#/category/', '').split('/')[0].split('?')[0];
+  if (pLower.startsWith('/c/')) {
+    const rawSlug = pathname.slice('/c/'.length).split('/')[0].split('?')[0];
+    const slug = decodeURIComponent(rawSlug).trim();
+    if (slug) return { route: 'category', params: { categoryId: slug, slug } };
+  }
+  if (hLower.startsWith('#/category/')) {
+    const rawSlug = hash.slice('#/category/'.length).split('/')[0].split('?')[0];
+    const slug = decodeURIComponent(rawSlug).trim();
     if (slug) return { route: 'category', params: { categoryId: slug, slug } };
   }
   if (search.has('category')) {
-    const slug = search.get('category') || '';
+    const slug = search.get('category')?.trim() || '';
+    if (slug) return { route: 'category', params: { categoryId: slug, slug } };
+  }
+  if (search.has('c')) {
+    const slug = search.get('c')?.trim() || '';
     if (slug) return { route: 'category', params: { categoryId: slug, slug } };
   }
 
   // 4. Standard Static Pages
-  if (pathname === '/shop' || hash === '#/shop') return { route: 'shop', params: {} };
-  if (pathname === '/cart' || hash === '#/cart') return { route: 'cart', params: {} };
-  if (pathname === '/checkout' || hash === '#/checkout') return { route: 'checkout', params: {} };
-  if (pathname === '/order-confirmation' || hash === '#/order-confirmation') return { route: 'order-confirmation', params: {} };
-  if (pathname === '/contact' || hash === '#/contact') return { route: 'contact', params: {} };
-  if (pathname === '/about' || hash === '#/about') return { route: 'about', params: {} };
-  if (pathname === '/delivery-policy' || hash === '#/delivery-policy') return { route: 'delivery-policy', params: {} };
-  if (pathname === '/terms' || hash === '#/terms') return { route: 'terms', params: {} };
-  if (pathname === '/privacy' || hash === '#/privacy') return { route: 'privacy', params: {} };
+  if (pLower === '/shop' || hLower === '#/shop') return { route: 'shop', params: {} };
+  if (pLower === '/cart' || hLower === '#/cart') return { route: 'cart', params: {} };
+  if (pLower === '/checkout' || hLower === '#/checkout') return { route: 'checkout', params: {} };
+  if (pLower === '/order-confirmation' || hLower === '#/order-confirmation') return { route: 'order-confirmation', params: {} };
+  if (pLower === '/contact' || hLower === '#/contact') return { route: 'contact', params: {} };
+  if (pLower === '/about' || hLower === '#/about') return { route: 'about', params: {} };
+  if (pLower === '/delivery-policy' || hLower === '#/delivery-policy') return { route: 'delivery-policy', params: {} };
+  if (pLower === '/terms' || hLower === '#/terms') return { route: 'terms', params: {} };
+  if (pLower === '/privacy' || hLower === '#/privacy') return { route: 'privacy', params: {} };
 
   return { route: 'home', params: {} };
 }
@@ -95,8 +149,8 @@ function MainApp() {
   const { isAdmin } = useAuth();
   const { toastMessage, clearToast } = useCart();
 
-  const [currentRoute, setCurrentRoute] = useState<string>('home');
-  const [routeParams, setRouteParams] = useState<Record<string, any>>({});
+  const [currentRoute, setCurrentRoute] = useState<string>(() => parseRouteFromLocation(false).route);
+  const [routeParams, setRouteParams] = useState<Record<string, any>>(() => parseRouteFromLocation(false).params);
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
@@ -246,11 +300,28 @@ function MainApp() {
     []
   );
 
-  // Find active product for product detail route
+  // Find active product for product detail route (resilient lookup)
   const activeProduct =
     currentRoute === 'product'
-      ? products.find((p) => p.slug === routeParams.slug || p.id === routeParams.id || p.sku === routeParams.slug) ||
-        products[0]
+      ? products.find((p) => {
+          const target = String(routeParams.slug || routeParams.id || '').toLowerCase();
+          return (
+            p.slug.toLowerCase() === target ||
+            p.id.toLowerCase() === target ||
+            (p.sku && p.sku.toLowerCase() === target) ||
+            p.name.toLowerCase() === target
+          );
+        }) ||
+        INITIAL_PRODUCTS.find((p) => {
+          const target = String(routeParams.slug || routeParams.id || '').toLowerCase();
+          return (
+            p.slug.toLowerCase() === target ||
+            p.id.toLowerCase() === target ||
+            (p.sku && p.sku.toLowerCase() === target)
+          );
+        }) ||
+        products[0] ||
+        INITIAL_PRODUCTS[0]
       : null;
 
   // Render Page Content
