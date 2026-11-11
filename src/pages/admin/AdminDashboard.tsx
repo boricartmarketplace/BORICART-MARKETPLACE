@@ -62,6 +62,7 @@ import { OfflinePosModal } from './OfflinePosModal';
 import { ProfitReportsTab } from './ProfitReportsTab';
 import { AdLinksCampaignTab } from './AdLinksCampaignTab';
 import { generateShareUrl } from '../../services/pixelService';
+import { NIGERIAN_STATES, DEFAULT_STATE_DELIVERY_FEES } from '../../data/initialCatalog';
 
 interface AdminDashboardProps {
   products: Product[];
@@ -131,6 +132,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [freeDeliveryThreshold, setFreeDeliveryThreshold] = useState<number>(settings.freeDeliveryThreshold);
   const [lagosDeliveryFee, setLagosDeliveryFee] = useState<number>(settings.lagosDeliveryFee ?? 2000);
   const [nationwideDeliveryFee, setNationwideDeliveryFee] = useState<number>(settings.nationwideDeliveryFee ?? 3500);
+  const [stateDeliveryFees, setStateDeliveryFees] = useState<Record<string, number>>(
+    settings.stateDeliveryFees || DEFAULT_STATE_DELIVERY_FEES
+  );
+  const [stateSearchFilter, setStateSearchFilter] = useState('');
   const [deliveryEstimatedDays, setDeliveryEstimatedDays] = useState<string>(
     settings.deliveryEstimatedDays || '1–2 Days Lagos, 2–4 Days Nationwide'
   );
@@ -237,6 +242,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     setFreeDeliveryThreshold(settings.freeDeliveryThreshold);
     setLagosDeliveryFee(settings.lagosDeliveryFee ?? 2000);
     setNationwideDeliveryFee(settings.nationwideDeliveryFee ?? 3500);
+    if (settings.stateDeliveryFees) {
+      setStateDeliveryFees(settings.stateDeliveryFees);
+    }
     setDeliveryEstimatedDays(settings.deliveryEstimatedDays || '1–2 Days Lagos, 2–4 Days Nationwide');
     setOfficeAddress(settings.officeAddress || '14 Admiralty Way, Lekki Phase 1, Lagos, Nigeria');
     setSupportEmail(settings.supportEmail);
@@ -265,7 +273,18 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     if (settings.pixels) {
       setPixels(settings.pixels);
     }
+    setCustomDomain(settings.customDomain || 'https://www.boricart.com.ng');
   }, [settings]);
+
+  // Handle custom domain update
+  const handleUpdateCustomDomain = async (newDomain: string) => {
+    setCustomDomain(newDomain);
+    await updateStoreSettings({
+      ...settings,
+      customDomain: newDomain,
+    });
+    await onRefreshData();
+  };
 
   // Analytics Metrics
   const totalProducts = products.length;
@@ -528,6 +547,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         freeDeliveryThreshold: Number(freeDeliveryThreshold),
         lagosDeliveryFee: Number(lagosDeliveryFee),
         nationwideDeliveryFee: Number(nationwideDeliveryFee),
+        stateDeliveryFees,
         deliveryEstimatedDays,
         officeAddress,
         announcementMessages: announcements,
@@ -645,6 +665,21 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               >
                 <ShoppingBag className="w-3.5 h-3.5" />
                 <span>Sell Offline (POS)</span>
+              </button>
+
+              <button
+                onClick={() => {
+                  const adminLink = generateShareUrl('/admin', { customDomain });
+                  if (navigator.clipboard) {
+                    navigator.clipboard.writeText(adminLink);
+                    showActionNotice('success', `Copied Admin Link: ${adminLink}`);
+                  }
+                }}
+                className="hidden lg:flex items-center gap-1.5 bg-gray-800 hover:bg-gray-700 text-[#F5A623] text-xs font-bold px-3 py-1.5 rounded-xl border border-gray-700 transition-colors cursor-pointer"
+                title="Copy your private admin portal URL for bookmarks and staff login"
+              >
+                <LinkIcon className="w-3.5 h-3.5" />
+                <span>Admin Link</span>
               </button>
 
               <button
@@ -781,6 +816,20 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               }`}
             >
               Store & Delivery Settings
+            </button>
+          )}
+
+          {allowedTabs.includes('ad-links') && (
+            <button
+              onClick={() => setActiveTab('ad-links')}
+              className={`py-3 px-3 text-xs sm:text-sm font-bold border-b-2 whitespace-nowrap transition-all flex items-center gap-1.5 ${
+                activeTab === 'ad-links'
+                  ? 'border-[#F5A623] text-[#F5A623]'
+                  : 'border-transparent text-gray-400 hover:text-gray-200'
+              }`}
+            >
+              <LinkIcon className="w-3.5 h-3.5 text-[#F5A623]" />
+              <span>Ad Links & Tracking</span>
             </button>
           )}
         </div>
@@ -2081,6 +2130,103 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     />
                   </div>
                 </div>
+
+                {/* State-by-State Location Delivery Fee Configurator */}
+                <div className="pt-6 border-t border-gray-100 space-y-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div>
+                      <h5 className="font-extrabold text-sm text-gray-900 flex items-center gap-2">
+                        <Truck className="w-4 h-4 text-[#F5A623]" />
+                        <span>State-by-State Delivery Money Rates</span>
+                      </h5>
+                      <p className="text-[11px] text-gray-500">
+                        Set custom delivery charges for each Nigerian state. Applied dynamically when buyers pick their state.
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setStateDeliveryFees(DEFAULT_STATE_DELIVERY_FEES);
+                          showActionNotice('success', 'Reset delivery rates to default Nigerian standard rates.');
+                        }}
+                        className="text-[11px] font-bold px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors cursor-pointer"
+                      >
+                        Reset Defaults
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const updated = { ...stateDeliveryFees };
+                          NIGERIAN_STATES.forEach((st) => {
+                            if (st === 'Lagos') updated[st] = lagosDeliveryFee;
+                            else updated[st] = nationwideDeliveryFee;
+                          });
+                          setStateDeliveryFees(updated);
+                          showActionNotice('success', `Applied Nationwide rate (₦${nationwideDeliveryFee.toLocaleString()}) to all other states.`);
+                        }}
+                        className="text-[11px] font-bold px-3 py-1.5 bg-amber-50 hover:bg-amber-100 text-[#D98200] border border-amber-200 rounded-lg transition-colors cursor-pointer"
+                      >
+                        Apply Flat to All
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Search filter for states */}
+                  <div className="relative">
+                    <Search className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-2.5" />
+                    <input
+                      type="text"
+                      placeholder="Search state (e.g. Lagos, Rivers, Abuja, Kano, Ogun)..."
+                      value={stateSearchFilter}
+                      onChange={(e) => setStateSearchFilter(e.target.value)}
+                      className="w-full text-xs bg-gray-50 border border-gray-200 rounded-xl pl-9 pr-3 py-2 focus:bg-white focus:outline-none focus:border-[#F5A623]"
+                    />
+                  </div>
+
+                  {/* States Grid */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 max-h-80 overflow-y-auto p-1 bg-gray-50/60 rounded-2xl border border-gray-100">
+                    {NIGERIAN_STATES.filter((st) =>
+                      st.toLowerCase().includes(stateSearchFilter.toLowerCase().trim())
+                    ).map((st) => {
+                      const fee = stateDeliveryFees[st] ?? (st === 'Lagos' ? lagosDeliveryFee : nationwideDeliveryFee);
+                      return (
+                        <div
+                          key={st}
+                          className="bg-white p-2.5 rounded-xl border border-gray-200/80 shadow-2xs flex items-center justify-between gap-2"
+                        >
+                          <div className="min-w-0 flex-1">
+                            <span className="text-xs font-bold text-gray-900 block truncate">{st}</span>
+                            <span className="text-[10px] text-gray-400">
+                              {st === 'Lagos' ? 'Express Hub' : st === 'FCT - Abuja' ? 'Federal Capital' : 'Interstate Delivery'}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-1 shrink-0">
+                            <span className="text-xs font-bold text-gray-400">₦</span>
+                            <input
+                              type="number"
+                              min="0"
+                              step="100"
+                              value={fee}
+                              onChange={(e) => {
+                                const newFee = Number(e.target.value) || 0;
+                                setStateDeliveryFees((prev) => ({
+                                  ...prev,
+                                  [st]: newFee,
+                                }));
+                                if (st === 'Lagos') {
+                                  setLagosDeliveryFee(newFee);
+                                }
+                              }}
+                              className="w-20 text-xs font-black bg-gray-50 border border-gray-200 rounded-lg px-2 py-1 text-right focus:bg-white focus:outline-none focus:border-[#F5A623]"
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
               </div>
 
               {/* CARD 3: ANNOUNCEMENT BAR MESSAGES */}
@@ -2219,6 +2365,17 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               </div>
             </form>
           </div>
+        )}
+
+        {/* TAB 8: AD CAMPAIGN LINKS & TRACKING */}
+        {activeTab === 'ad-links' && (
+          <AdLinksCampaignTab
+            products={products}
+            categories={categories}
+            settings={settings}
+            onUpdateDomain={handleUpdateCustomDomain}
+            onShowNotice={showActionNotice}
+          />
         )}
       </div>
 

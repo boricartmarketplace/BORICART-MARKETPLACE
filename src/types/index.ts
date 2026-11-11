@@ -62,6 +62,8 @@ export interface Product {
   faqsList?: ProductFaq[]; // Product FAQs editable by admin
   guaranteeText?: string; // Warranty/Guaranty copy
   freeDeliveryNote?: string; // Delivery incentive copy
+  deliveryFeeOverride?: number; // Optional specific delivery fee in NGN for this product
+  isFreeDelivery?: boolean; // When true, free delivery is automatically applied for this product
 
   createdAt: string;
   updatedAt: string;
@@ -252,6 +254,7 @@ export interface StoreSettings {
   freeDeliveryThreshold: number;
   lagosDeliveryFee?: number;
   nationwideDeliveryFee?: number;
+  stateDeliveryFees?: Record<string, number>; // Delivery fee per Nigerian state, e.g. { "Lagos": 2000, "FCT - Abuja": 2500, "Rivers": 3000 }
   deliveryEstimatedDays?: string;
   announcementMessages?: string[];
   heroImage?: string;

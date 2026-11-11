@@ -17,19 +17,22 @@ import confetti from 'canvas-confetti';
 import { useCart } from '../context/CartContext';
 import { formatNaira, createOrder } from '../firebase/services';
 import { NIGERIAN_STATES } from '../data/initialCatalog';
-import { Order } from '../types';
+import { Order, StoreSettings } from '../types';
 import { trackInitiateCheckout, trackPurchase } from '../services/pixelService';
+import { calculateDeliveryFee } from '../firebase/services';
 
 interface CheckoutPageProps {
   onNavigate: (page: string, params?: Record<string, any>) => void;
   deliveryFee?: number;
   freeDeliveryThreshold?: number;
+  settings?: StoreSettings;
 }
 
 export const CheckoutPage: React.FC<CheckoutPageProps> = ({
   onNavigate,
   deliveryFee = 2500,
   freeDeliveryThreshold = 50000,
+  settings,
 }) => {
   const { items, subtotal, clearCart } = useCart();
 
@@ -46,8 +49,12 @@ export const CheckoutPage: React.FC<CheckoutPageProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const isFreeDelivery = subtotal >= freeDeliveryThreshold;
-  const effectiveDeliveryFee = isFreeDelivery ? 0 : deliveryFee;
+  const effectiveDeliveryFee = calculateDeliveryFee(
+    formData.state,
+    settings,
+    subtotal
+  );
+  const isFreeDelivery = effectiveDeliveryFee === 0;
   const grandTotal = subtotal + effectiveDeliveryFee;
 
   // Track InitiateCheckout on mount if cart has items

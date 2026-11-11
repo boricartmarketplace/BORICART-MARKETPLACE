@@ -64,6 +64,8 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
   const [costPrice, setCostPrice] = useState<number | ''>('');
   const [adSpend, setAdSpend] = useState<number | ''>('');
   const [offlinePrice, setOfflinePrice] = useState<number | ''>('');
+  const [deliveryOption, setDeliveryOption] = useState<'standard' | 'free' | 'custom'>('standard');
+  const [deliveryFeeOverride, setDeliveryFeeOverride] = useState<number | ''>('');
 
   // Sales Page & Direct Response Fields
   const [headline, setHeadline] = useState('');
@@ -121,6 +123,16 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
       setCostPrice(product.costPrice ?? '');
       setAdSpend(product.adSpend ?? '');
       setOfflinePrice(product.offlinePrice ?? '');
+      if (product.isFreeDelivery) {
+        setDeliveryOption('free');
+        setDeliveryFeeOverride('');
+      } else if (product.deliveryFeeOverride !== undefined && product.deliveryFeeOverride !== null && product.deliveryFeeOverride >= 0) {
+        setDeliveryOption('custom');
+        setDeliveryFeeOverride(product.deliveryFeeOverride);
+      } else {
+        setDeliveryOption('standard');
+        setDeliveryFeeOverride('');
+      }
       setImages(product.images || [product.mainImage]);
       setMainImage(product.mainImage);
 
@@ -411,6 +423,11 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
         costPrice: costPrice !== '' ? Number(costPrice) : 0,
         adSpend: adSpend !== '' ? Number(adSpend) : 0,
         offlinePrice: offlinePrice !== '' ? Number(offlinePrice) : undefined,
+        isFreeDelivery: deliveryOption === 'free',
+        deliveryFeeOverride:
+          deliveryOption === 'custom' && deliveryFeeOverride !== ''
+            ? Number(deliveryFeeOverride)
+            : undefined,
 
         // High-converting Sales Landing Page Fields
         headline: headline.trim() || undefined,
@@ -674,6 +691,175 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                     onChange={(e) => setShortDescription(e.target.value)}
                     className="w-full text-sm bg-gray-50 border border-gray-200 rounded-xl p-3 focus:bg-white focus:outline-none focus:border-[#F5A623]"
                   />
+                </div>
+
+                {/* ================= PRIMARY PRICING & DELIVERY MONEY CONFIGURATION ================= */}
+                <div className="p-5 bg-gradient-to-r from-amber-50/90 via-orange-50/50 to-yellow-50/70 rounded-2xl border-2 border-amber-300 shadow-xs space-y-4">
+                  <div className="flex items-center justify-between pb-2 border-b border-amber-200/80">
+                    <div className="flex items-center gap-2">
+                      <span className="w-6 h-6 rounded-lg bg-[#F5A623] text-black font-black text-xs flex items-center justify-center">
+                        ₦
+                      </span>
+                      <div>
+                        <h4 className="font-black text-sm text-gray-900">
+                          Product Pricing & Delivery Money
+                        </h4>
+                        <p className="text-[11px] text-gray-600">
+                          Enter the product selling price and location delivery rules directly.
+                        </p>
+                      </div>
+                    </div>
+                    <span className="text-[11px] font-black bg-amber-200 text-amber-950 px-2.5 py-0.5 rounded-full uppercase tracking-wider">
+                      Required for Checkout
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-xs font-bold text-gray-900 mb-1">
+                        Regular Selling Price (₦) <span className="text-red-500">*</span>
+                      </label>
+                      <div className="relative">
+                        <span className="absolute left-3 top-2.5 text-xs font-black text-gray-500">₦</span>
+                        <input
+                          type="number"
+                          required
+                          min="0"
+                          placeholder="e.g. 35000"
+                          value={regularPrice}
+                          onChange={(e) => setRegularPrice(e.target.value ? Number(e.target.value) : '')}
+                          className="w-full text-sm font-black bg-white border-2 border-gray-300 rounded-xl pl-8 pr-3 py-2.5 focus:border-[#F5A623] focus:outline-none text-gray-950 shadow-2xs"
+                        />
+                      </div>
+                      <span className="text-[10px] text-gray-500 mt-1 block">Full standard retail price</span>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-gray-900 mb-1">
+                        Discount / Promo Price (₦)
+                      </label>
+                      <div className="relative">
+                        <span className="absolute left-3 top-2.5 text-xs font-black text-[#D98200]">₦</span>
+                        <input
+                          type="number"
+                          min="0"
+                          placeholder="e.g. 26500"
+                          value={promotionalPrice}
+                          onChange={(e) => setPromotionalPrice(e.target.value ? Number(e.target.value) : '')}
+                          className="w-full text-sm font-black bg-white border-2 border-gray-300 rounded-xl pl-8 pr-3 py-2.5 focus:border-[#F5A623] focus:outline-none text-[#D98200] shadow-2xs"
+                        />
+                      </div>
+                      <span className="text-[10px] text-gray-500 mt-1 block">Active price on sales page if set</span>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-gray-900 mb-1">
+                        Stock Units Available <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        value={stockQuantity}
+                        onChange={(e) => setStockQuantity(e.target.value ? Number(e.target.value) : '')}
+                        className="w-full text-sm font-bold bg-white border-2 border-gray-300 rounded-xl px-3 py-2.5 focus:border-[#F5A623] focus:outline-none text-gray-900 shadow-2xs"
+                      />
+                      <span className="text-[10px] text-gray-500 mt-1 block">Inventory stock counter</span>
+                    </div>
+                  </div>
+
+                  {/* Delivery Rules for this Product */}
+                  <div className="pt-3 border-t border-amber-200/70">
+                    <label className="block text-xs font-bold text-gray-900 mb-2">
+                      Delivery Money & Shipping Setting for this Product:
+                    </label>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                      <label
+                        className={`flex items-start gap-2.5 p-3 rounded-xl border text-xs cursor-pointer transition-all ${
+                          deliveryOption === 'standard'
+                            ? 'bg-white border-[#F5A623] shadow-xs ring-1 ring-[#F5A623]'
+                            : 'bg-white/80 border-gray-200 hover:bg-white'
+                        }`}
+                      >
+                        <input
+                          type="radio"
+                          name="deliveryOption"
+                          checked={deliveryOption === 'standard'}
+                          onChange={() => setDeliveryOption('standard')}
+                          className="mt-0.5 text-[#F5A623] focus:ring-[#F5A623]"
+                        />
+                        <div>
+                          <span className="font-bold text-gray-900 block">Location-Based Rates</span>
+                          <span className="text-[10px] text-gray-500 block leading-tight">
+                            Calculates automatically by buyer's State (Lagos ₦2k, Abuja ₦2.5k, Rivers ₦3k, etc.)
+                          </span>
+                        </div>
+                      </label>
+
+                      <label
+                        className={`flex items-start gap-2.5 p-3 rounded-xl border text-xs cursor-pointer transition-all ${
+                          deliveryOption === 'free'
+                            ? 'bg-white border-emerald-500 shadow-xs ring-1 ring-emerald-500'
+                            : 'bg-white/80 border-gray-200 hover:bg-white'
+                        }`}
+                      >
+                        <input
+                          type="radio"
+                          name="deliveryOption"
+                          checked={deliveryOption === 'free'}
+                          onChange={() => setDeliveryOption('free')}
+                          className="mt-0.5 text-emerald-600 focus:ring-emerald-500"
+                        />
+                        <div>
+                          <span className="font-bold text-emerald-900 block">100% Free Delivery</span>
+                          <span className="text-[10px] text-emerald-700 block leading-tight">
+                            Zero shipping fee for customer anywhere across Nigeria
+                          </span>
+                        </div>
+                      </label>
+
+                      <label
+                        className={`flex items-start gap-2.5 p-3 rounded-xl border text-xs cursor-pointer transition-all ${
+                          deliveryOption === 'custom'
+                            ? 'bg-white border-blue-500 shadow-xs ring-1 ring-blue-500'
+                            : 'bg-white/80 border-gray-200 hover:bg-white'
+                        }`}
+                      >
+                        <input
+                          type="radio"
+                          name="deliveryOption"
+                          checked={deliveryOption === 'custom'}
+                          onChange={() => setDeliveryOption('custom')}
+                          className="mt-0.5 text-blue-600 focus:ring-blue-500"
+                        />
+                        <div>
+                          <span className="font-bold text-gray-900 block">Custom Product Flat Fee</span>
+                          <span className="text-[10px] text-gray-500 block leading-tight">
+                            Fixed shipping price override for this heavy/bulky item
+                          </span>
+                        </div>
+                      </label>
+                    </div>
+
+                    {deliveryOption === 'custom' && (
+                      <div className="mt-3 p-3 bg-white rounded-xl border border-blue-200 flex flex-col sm:flex-row sm:items-center gap-3">
+                        <label className="text-xs font-bold text-gray-800 whitespace-nowrap">
+                          Custom Flat Delivery Fee (₦):
+                        </label>
+                        <div className="relative max-w-xs flex-1">
+                          <span className="absolute left-3 top-2 text-xs font-bold text-gray-400">₦</span>
+                          <input
+                            type="number"
+                            min="0"
+                            placeholder="e.g. 4000"
+                            value={deliveryFeeOverride}
+                            onChange={(e) => setDeliveryFeeOverride(e.target.value ? Number(e.target.value) : '')}
+                            className="w-full text-xs font-bold bg-gray-50 border border-gray-300 rounded-lg pl-7 pr-3 py-1.5 focus:outline-none focus:border-blue-500"
+                          />
+                        </div>
+                        <span className="text-[11px] text-gray-500">Overrides location rates for this product.</span>
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 {/* Image Management Section */}

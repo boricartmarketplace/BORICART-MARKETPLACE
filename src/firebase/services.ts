@@ -12,7 +12,7 @@ import {
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage } from './config';
 import { Product, Category, Order, OrderStatus, PaymentStatus, StoreSettings, AdminUser, AdminRole } from '../types';
-import { INITIAL_CATEGORIES, INITIAL_PRODUCTS, DEFAULT_SETTINGS, INITIAL_STAFF, INITIAL_ORDERS } from '../data/initialCatalog';
+import { INITIAL_CATEGORIES, INITIAL_PRODUCTS, DEFAULT_SETTINGS, INITIAL_STAFF, INITIAL_ORDERS, DEFAULT_STATE_DELIVERY_FEES } from '../data/initialCatalog';
 
 // Collection references
 const PRODUCTS_COLLECTION = 'products';
@@ -27,9 +27,95 @@ const STORAGE_KEY_CATEGORIES = 'boricart_catalog_categories';
 const STORAGE_KEY_SETTINGS = 'boricart_store_settings';
 const STORAGE_KEY_STAFF = 'boricart_staff_members';
 const STORAGE_KEY_ORDERS = 'boricart_customer_orders';
+const STORAGE_KEY_SEEDED = 'boricart_database_seeded';
+const STORAGE_KEY_DELETED_PRODUCT_IDS = 'boricart_deleted_product_ids';
+const STORAGE_KEY_DELETED_CATEGORY_IDS = 'boricart_deleted_category_ids';
 
 // Cache to prevent duplicate auto-seeding
 let isSeedingInProgress = false;
+
+// Helpers for persistent deletion tombstones & seeding protection
+export function getDeletedProductIds(): Set<string> {
+  const ids = getLocalCache<string[]>(STORAGE_KEY_DELETED_PRODUCT_IDS) || [];
+  return new Set(ids);
+}
+
+export async function recordDeletedProductId(id: string, slug?: string): Promise<void> {
+  const current = getLocalCache<string[]>(STORAGE_KEY_DELETED_PRODUCT_IDS) || [];
+  const set = new Set(current);
+  if (id) set.add(id);
+  if (slug) set.add(slug);
+  const arr = Array.from(set);
+  setLocalCache(STORAGE_KEY_DELETED_PRODUCT_IDS, arr);
+
+  // Sync to Firestore tombstones doc so deletions persist across browsers/sessions
+  try {
+    await setDoc(doc(db, SETTINGS_COLLECTION, 'tombstones'), {
+      deletedProductIds: arr,
+      updatedAt: new Date().toISOString(),
+    }, { merge: true });
+  } catch (e) {
+    console.warn('Could not sync deleted tombstone to Firestore:', e);
+  }
+}
+
+export function isDatabaseAlreadySeeded(): boolean {
+  return localStorage.getItem(STORAGE_KEY_SEEDED) === 'true';
+}
+
+export function markDatabaseAsSeeded(): void {
+  localStorage.setItem(STORAGE_KEY_SEEDED, 'true');
+}
+
+export async function checkRemoteSeededStatus(): Promise<boolean> {
+  if (isDatabaseAlreadySeeded()) return true;
+  try {
+    const docSnap = await getDoc(doc(db, SETTINGS_COLLECTION, 'seeding_status'));
+    if (docSnap.exists() && docSnap.data()?.seeded) {
+      markDatabaseAsSeeded();
+      return true;
+    }
+  } catch (e) {
+    // Firestore might be in rules/offline mode
+  }
+  return false;
+}
+
+// Calculate location-based dynamic delivery fee
+export function calculateDeliveryFee(
+  state: string,
+  settings?: StoreSettings | null,
+  subtotal: number = 0,
+  product?: Product | null
+): number {
+  if (product?.isFreeDelivery) return 0;
+  if (product?.deliveryFeeOverride !== undefined && product.deliveryFeeOverride !== null && product.deliveryFeeOverride >= 0) {
+    return product.deliveryFeeOverride;
+  }
+  const effectiveSettings = settings || DEFAULT_SETTINGS;
+  if (effectiveSettings.freeDeliveryThreshold && subtotal >= effectiveSettings.freeDeliveryThreshold) {
+    return 0;
+  }
+
+  const cleanState = (state || '').trim();
+  if (!cleanState) {
+    return effectiveSettings.deliveryFee || 2500;
+  }
+
+  if (cleanState.toLowerCase() === 'lagos') {
+    return effectiveSettings.lagosDeliveryFee ?? 2000;
+  }
+
+  if (effectiveSettings.stateDeliveryFees && effectiveSettings.stateDeliveryFees[cleanState] !== undefined) {
+    return effectiveSettings.stateDeliveryFees[cleanState];
+  }
+
+  if (DEFAULT_STATE_DELIVERY_FEES && DEFAULT_STATE_DELIVERY_FEES[cleanState] !== undefined) {
+    return DEFAULT_STATE_DELIVERY_FEES[cleanState];
+  }
+
+  return effectiveSettings.nationwideDeliveryFee ?? (effectiveSettings.deliveryFee || 3500);
+}
 
 // Format Nigerian Naira currency
 export function formatNaira(amount: number): string {
@@ -92,6 +178,20 @@ function setLocalCache<T>(key: string, data: T): void {
 // =================== PRODUCTS SERVICES ===================
 
 export async function getProducts(onlyPublished = true): Promise<Product[]> {
+  const deletedIds = getDeletedProductIds();
+
+  // Opportunistically sync remote tombstones
+  try {
+    const tombstoneDoc = await getDoc(doc(db, SETTINGS_COLLECTION, 'tombstones'));
+    if (tombstoneDoc.exists() && tombstoneDoc.data()?.deletedProductIds) {
+      const remoteDeleted = tombstoneDoc.data().deletedProductIds as string[];
+      remoteDeleted.forEach((id) => deletedIds.add(id));
+      setLocalCache(STORAGE_KEY_DELETED_PRODUCT_IDS, Array.from(deletedIds));
+    }
+  } catch (e) {
+    // ignore network errors
+  }
+
   try {
     let q;
     if (onlyPublished) {
@@ -102,25 +202,33 @@ export async function getProducts(onlyPublished = true): Promise<Product[]> {
 
     const snapshot = await getDocs(q);
 
-    if (snapshot.empty && !isSeedingInProgress) {
-      // Check local storage cache before seeding
-      const cached = getLocalCache<Product[]>(STORAGE_KEY_PRODUCTS);
-      if (cached && cached.length > 0) {
-        return onlyPublished ? cached.filter((p) => p.status === 'published') : cached;
+    if (snapshot.empty) {
+      const isSeeded = isDatabaseAlreadySeeded() || (await checkRemoteSeededStatus());
+      if (!isSeeded && !isSeedingInProgress) {
+        await seedInitialDatabase();
+        const initialFiltered = (onlyPublished
+          ? INITIAL_PRODUCTS.filter((p) => p.status === 'published')
+          : INITIAL_PRODUCTS
+        ).filter((p) => !deletedIds.has(p.id) && !deletedIds.has(p.slug));
+        return initialFiltered;
       }
 
-      await seedInitialDatabase();
-      return onlyPublished
-        ? INITIAL_PRODUCTS.filter((p) => p.status === 'published')
-        : INITIAL_PRODUCTS;
+      // Database was already initialized; an empty snapshot means products were intentionally deleted.
+      // Do NOT re-seed deleted products!
+      const cached = getLocalCache<Product[]>(STORAGE_KEY_PRODUCTS) || [];
+      const cleanCached = cached.filter((p) => !deletedIds.has(p.id) && !deletedIds.has(p.slug));
+      return onlyPublished ? cleanCached.filter((p) => p.status === 'published') : cleanCached;
     }
 
     const products: Product[] = [];
     snapshot.forEach((docSnap) => {
-      products.push({ id: docSnap.id, ...(docSnap.data() as Omit<Product, 'id'>) });
+      const data = docSnap.data() as Omit<Product, 'id'>;
+      if (!deletedIds.has(docSnap.id) && (!data.slug || !deletedIds.has(data.slug))) {
+        products.push({ id: docSnap.id, ...data });
+      }
     });
 
-    // Update local cache
+    // Update local cache with non-deleted items only
     if (!onlyPublished) {
       setLocalCache(STORAGE_KEY_PRODUCTS, products);
     }
@@ -128,41 +236,65 @@ export async function getProducts(onlyPublished = true): Promise<Product[]> {
     return products;
   } catch (error) {
     console.warn('Network notice when loading products from Firestore, using local cache:', error);
-    const cached = getLocalCache<Product[]>(STORAGE_KEY_PRODUCTS) || INITIAL_PRODUCTS;
-    return onlyPublished ? cached.filter((p) => p.status === 'published') : cached;
+    const cached = getLocalCache<Product[]>(STORAGE_KEY_PRODUCTS);
+    const isSeeded = isDatabaseAlreadySeeded();
+    const baseList = cached !== null ? cached : (isSeeded ? [] : INITIAL_PRODUCTS);
+    const cleanList = baseList.filter((p) => !deletedIds.has(p.id) && !deletedIds.has(p.slug));
+    return onlyPublished ? cleanList.filter((p) => p.status === 'published') : cleanList;
   }
 }
 
 export async function getProductById(id: string): Promise<Product | null> {
+  const deletedIds = getDeletedProductIds();
+  if (deletedIds.has(id)) return null;
+
   try {
     const docRef = doc(db, PRODUCTS_COLLECTION, id);
     const docSnap = await getDoc(docRef);
     if (docSnap.exists()) {
-      return { id: docSnap.id, ...(docSnap.data() as Omit<Product, 'id'>) };
+      const data = docSnap.data() as Omit<Product, 'id'>;
+      if (deletedIds.has(docSnap.id) || (data.slug && deletedIds.has(data.slug))) {
+        return null;
+      }
+      return { id: docSnap.id, ...data };
     }
-    const cached = getLocalCache<Product[]>(STORAGE_KEY_PRODUCTS) || INITIAL_PRODUCTS;
-    return cached.find((p) => p.id === id || p.slug === id) || null;
+    const cached = getLocalCache<Product[]>(STORAGE_KEY_PRODUCTS) || [];
+    const found = cached.find((p) => p.id === id || p.slug === id);
+    if (found && !deletedIds.has(found.id) && !deletedIds.has(found.slug)) {
+      return found;
+    }
+    return null;
   } catch (error) {
     console.warn('Error fetching product by id, using cache:', error);
-    const cached = getLocalCache<Product[]>(STORAGE_KEY_PRODUCTS) || INITIAL_PRODUCTS;
-    return cached.find((p) => p.id === id || p.slug === id) || null;
+    const cached = getLocalCache<Product[]>(STORAGE_KEY_PRODUCTS) || [];
+    const found = cached.find((p) => p.id === id || p.slug === id);
+    return found && !deletedIds.has(found.id) && !deletedIds.has(found.slug) ? found : null;
   }
 }
 
 export async function getProductBySlug(slug: string): Promise<Product | null> {
+  const deletedIds = getDeletedProductIds();
+  if (deletedIds.has(slug)) return null;
+
   try {
     const q = query(collection(db, PRODUCTS_COLLECTION), where('slug', '==', slug));
     const snapshot = await getDocs(q);
     if (!snapshot.empty) {
       const docSnap = snapshot.docs[0];
-      return { id: docSnap.id, ...(docSnap.data() as Omit<Product, 'id'>) };
+      const data = docSnap.data() as Omit<Product, 'id'>;
+      if (deletedIds.has(docSnap.id) || deletedIds.has(data.slug)) {
+        return null;
+      }
+      return { id: docSnap.id, ...data };
     }
-    const cached = getLocalCache<Product[]>(STORAGE_KEY_PRODUCTS) || INITIAL_PRODUCTS;
-    return cached.find((p) => p.slug === slug || p.id === slug) || null;
+    const cached = getLocalCache<Product[]>(STORAGE_KEY_PRODUCTS) || [];
+    const found = cached.find((p) => p.slug === slug || p.id === slug);
+    return found && !deletedIds.has(found.id) && !deletedIds.has(found.slug) ? found : null;
   } catch (error) {
     console.warn('Error fetching product by slug, using cache:', error);
-    const cached = getLocalCache<Product[]>(STORAGE_KEY_PRODUCTS) || INITIAL_PRODUCTS;
-    return cached.find((p) => p.slug === slug || p.id === slug) || null;
+    const cached = getLocalCache<Product[]>(STORAGE_KEY_PRODUCTS) || [];
+    const found = cached.find((p) => p.slug === slug || p.id === slug);
+    return found && !deletedIds.has(found.id) && !deletedIds.has(found.slug) ? found : null;
   }
 }
 
@@ -170,6 +302,21 @@ export async function saveProduct(productData: Partial<Product> & { name: string
   const id = productData.id || `bc-${Date.now()}`;
   const slug = productData.slug || slugify(productData.name);
   const now = new Date().toISOString();
+
+  // If this product was previously marked as deleted, resurrect it cleanly
+  const currentDeleted = getLocalCache<string[]>(STORAGE_KEY_DELETED_PRODUCT_IDS) || [];
+  if (currentDeleted.includes(id) || currentDeleted.includes(slug)) {
+    const cleaned = currentDeleted.filter((d) => d !== id && d !== slug);
+    setLocalCache(STORAGE_KEY_DELETED_PRODUCT_IDS, cleaned);
+    try {
+      await setDoc(doc(db, SETTINGS_COLLECTION, 'tombstones'), {
+        deletedProductIds: cleaned,
+        updatedAt: now,
+      }, { merge: true });
+    } catch (e) {
+      // ignore
+    }
+  }
 
   const productToSave: Product = {
     id,
@@ -183,6 +330,8 @@ export async function saveProduct(productData: Partial<Product> & { name: string
     costPrice: productData.costPrice !== undefined && productData.costPrice !== null ? Number(productData.costPrice) : 0,
     adSpend: productData.adSpend !== undefined && productData.adSpend !== null ? Number(productData.adSpend) : 0,
     offlinePrice: productData.offlinePrice ? Number(productData.offlinePrice) : undefined,
+    deliveryFeeOverride: productData.deliveryFeeOverride !== undefined && productData.deliveryFeeOverride !== null ? Number(productData.deliveryFeeOverride) : undefined,
+    isFreeDelivery: Boolean(productData.isFreeDelivery),
     productType: productData.productType || 'physical',
     categoryId: productData.categoryId || 'cat-lifestyle',
     categoryName: productData.categoryName || 'Lifestyle',
@@ -206,7 +355,7 @@ export async function saveProduct(productData: Partial<Product> & { name: string
   };
 
   // 1. Optimistic Local Cache Update
-  const cachedProducts = getLocalCache<Product[]>(STORAGE_KEY_PRODUCTS) || [...INITIAL_PRODUCTS];
+  const cachedProducts = getLocalCache<Product[]>(STORAGE_KEY_PRODUCTS) || [];
   const existingIdx = cachedProducts.findIndex((p) => p.id === id);
   if (existingIdx >= 0) {
     cachedProducts[existingIdx] = productToSave;
@@ -227,15 +376,32 @@ export async function saveProduct(productData: Partial<Product> & { name: string
 }
 
 export async function deleteProduct(id: string): Promise<void> {
-  // Update local cache
-  const cachedProducts = getLocalCache<Product[]>(STORAGE_KEY_PRODUCTS) || [...INITIAL_PRODUCTS];
-  const updated = cachedProducts.filter((p) => p.id !== id && p.slug !== id);
+  const cachedProducts = getLocalCache<Product[]>(STORAGE_KEY_PRODUCTS) || [];
+  const found = cachedProducts.find((p) => p.id === id || p.slug === id);
+  const slug = found?.slug;
+
+  // 1. Record persistent tombstone so it NEVER resurrects on login or refresh
+  await recordDeletedProductId(id, slug);
+
+  // 2. Update local cache immediately
+  const updated = cachedProducts.filter((p) => p.id !== id && p.slug !== id && (!slug || p.slug !== slug));
   setLocalCache(STORAGE_KEY_PRODUCTS, updated);
 
+  // 3. Delete from Firestore
   try {
     await deleteDoc(doc(db, PRODUCTS_COLLECTION, id));
+    if (found && found.id !== id) {
+      await deleteDoc(doc(db, PRODUCTS_COLLECTION, found.id));
+    }
   } catch (error) {
     console.warn('Firestore delete warning:', error);
+  }
+
+  // Dispatch local event for instant UI sync
+  try {
+    window.dispatchEvent(new CustomEvent('boricart:product_deleted', { detail: { id, slug } }));
+  } catch {
+    // ignore
   }
 }
 
@@ -618,13 +784,21 @@ export async function uploadProductImage(file: File): Promise<string> {
 // =================== SEED DATABASE ===================
 
 export async function seedInitialDatabase(force = false): Promise<void> {
-  if (isSeedingInProgress && !force) return;
+  if (!force) {
+    if (isDatabaseAlreadySeeded()) return;
+    const isRemoteSeeded = await checkRemoteSeededStatus();
+    if (isRemoteSeeded) return;
+  }
+  if (isSeedingInProgress) return;
   isSeedingInProgress = true;
 
   try {
+    const deleted = getDeletedProductIds();
+    const prodsToSeed = INITIAL_PRODUCTS.filter((p) => !deleted.has(p.id) && !deleted.has(p.slug));
+
     // Cache defaults locally
     setLocalCache(STORAGE_KEY_CATEGORIES, INITIAL_CATEGORIES);
-    setLocalCache(STORAGE_KEY_PRODUCTS, INITIAL_PRODUCTS);
+    setLocalCache(STORAGE_KEY_PRODUCTS, prodsToSeed);
     setLocalCache(STORAGE_KEY_SETTINGS, DEFAULT_SETTINGS);
     setLocalCache(STORAGE_KEY_STAFF, INITIAL_STAFF);
 
@@ -633,19 +807,26 @@ export async function seedInitialDatabase(force = false): Promise<void> {
       await setDoc(doc(db, CATEGORIES_COLLECTION, cat.id), stripUndefined(cat));
     }
 
-    // 2. Seed products
-    for (const prod of INITIAL_PRODUCTS) {
+    // 2. Seed products (excluding any deleted ones)
+    for (const prod of prodsToSeed) {
       await setDoc(doc(db, PRODUCTS_COLLECTION, prod.id), stripUndefined(prod));
     }
 
     // 3. Seed settings
     await setDoc(doc(db, SETTINGS_COLLECTION, 'general'), stripUndefined(DEFAULT_SETTINGS));
 
-    // 4. Seed initial staff & roles
+    // 4. Record permanent seeding status
+    await setDoc(doc(db, SETTINGS_COLLECTION, 'seeding_status'), {
+      seeded: true,
+      seededAt: new Date().toISOString(),
+    });
+
+    // 5. Seed initial staff & roles
     for (const staff of INITIAL_STAFF) {
       await setDoc(doc(db, ADMINS_COLLECTION, staff.id), stripUndefined(staff));
     }
 
+    markDatabaseAsSeeded();
     console.log('Boricart database seeded with initial catalog and staff.');
   } catch (error) {
     console.warn('Database seeding notice (using local defaults):', error);

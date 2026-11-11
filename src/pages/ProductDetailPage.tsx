@@ -25,8 +25,8 @@ import {
   Copy,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
-import { Product, ProductReview, ProductFaq } from '../types';
-import { formatNaira, createOrder } from '../firebase/services';
+import { Product, ProductReview, ProductFaq, StoreSettings } from '../types';
+import { formatNaira, createOrder, calculateDeliveryFee } from '../firebase/services';
 import { useCart } from '../context/CartContext';
 import { useWishlist } from '../context/WishlistContext';
 import { WhatsAppButton } from '../components/common/WhatsAppButton';
@@ -39,13 +39,16 @@ interface ProductDetailPageProps {
   onNavigate: (page: string, params?: Record<string, any>) => void;
   whatsappNumber?: string;
   deliveryFee?: number;
+  settings?: StoreSettings;
 }
 
 export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
   product,
+  allProducts,
   onNavigate,
   whatsappNumber = '+2348140008921',
   deliveryFee = 2500,
+  settings,
 }) => {
   const { addToCart } = useCart();
   const { isInWishlist, toggleWishlist } = useWishlist();
@@ -148,8 +151,13 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
   const isOutOfStock = product.stockStatus === 'out_of_stock' || product.stockQuantity === 0;
 
   const itemSubtotal = currentPrice * quantity;
-  const isFreeDelivery = itemSubtotal >= 15000;
-  const currentDeliveryFee = isFreeDelivery ? 0 : deliveryFee;
+  const currentDeliveryFee = calculateDeliveryFee(
+    orderForm.state,
+    settings,
+    itemSubtotal,
+    product
+  );
+  const isFreeDelivery = currentDeliveryFee === 0;
   const totalAmountDue = itemSubtotal + currentDeliveryFee;
 
   // Fallback reviews if not provided by admin
@@ -960,8 +968,10 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
                   <span>{formatNaira(currentPrice)}</span>
                 </div>
                 <div className="flex justify-between text-gray-400">
-                  <span>Delivery Fee:</span>
-                  <span>{isFreeDelivery ? 'FREE DELIVERY' : formatNaira(currentDeliveryFee)}</span>
+                  <span>Delivery Fee ({orderForm.state}):</span>
+                  <span className={isFreeDelivery ? 'text-emerald-400 font-bold' : 'text-white'}>
+                    {isFreeDelivery ? 'FREE DELIVERY' : formatNaira(currentDeliveryFee)}
+                  </span>
                 </div>
                 <div className="flex justify-between font-black text-base text-white pt-2 border-t border-gray-700">
                   <span>Total Amount Due on Delivery:</span>

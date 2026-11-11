@@ -53,7 +53,7 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({ onNavigate }) => {
         setSuccessMsg('Account registered and role privileges activated!');
         setTimeout(() => {
           onNavigate('admin-dashboard');
-        }, 600);
+        }, 500);
       } else {
         if (!email.trim() || !password) throw new Error('Please provide both email and password');
         await loginWithEmailPassword(email, password);
@@ -64,10 +64,13 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({ onNavigate }) => {
       let msg = err.message || 'Authentication failed. Please verify credentials.';
       if (err.code === 'auth/email-already-in-use') {
         msg = 'This email is already registered. Please sign in instead.';
-      } else if (err.code === 'auth/wrong-password' || err.code === 'auth/user-not-found' || err.code === 'auth/invalid-credential') {
-        msg = 'Invalid email or password. Please verify your credentials or register.';
-      } else if (err.code === 'auth/operation-not-allowed') {
-        msg = 'Email/Password provider is not activated in the Firebase Console yet. You can click any of the Quick Access options below to sign in immediately!';
+      } else if (
+        err.code === 'auth/wrong-password' ||
+        err.code === 'auth/user-not-found' ||
+        err.code === 'auth/invalid-credential' ||
+        err.code === 'auth/invalid-login-credentials'
+      ) {
+        msg = 'Invalid credentials. If this is your first time, you can click Instant Access below or Register Admin.';
       }
       setError(msg);
     } finally {
@@ -79,6 +82,11 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({ onNavigate }) => {
   const handleQuickAccess = (role: AdminRole = 'overall_admin') => {
     loginDemoAdmin(role);
     onNavigate('admin-dashboard');
+  };
+
+  const handleFillSuperAdmin = () => {
+    setEmail('boricartmarketplace@gmail.com');
+    setPassword('boricart2026');
   };
 
   return (
@@ -207,8 +215,18 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({ onNavigate }) => {
               />
               <Key className="w-4 h-4 text-gray-400 absolute left-3 top-3" />
             </div>
-            {mode === 'register' && (
+            {mode === 'register' ? (
               <span className="text-[10px] text-gray-400 mt-1 block">Minimum 6 characters</span>
+            ) : (
+              <div className="flex justify-between items-center mt-1">
+                <button
+                  type="button"
+                  onClick={handleFillSuperAdmin}
+                  className="text-[11px] text-[#F5A623] hover:underline font-bold cursor-pointer"
+                >
+                  ⚡ Auto-fill Super Admin (boricartmarketplace@gmail.com)
+                </button>
+              </div>
             )}
           </div>
 

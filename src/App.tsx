@@ -323,6 +323,7 @@ function MainApp() {
             onNavigate={handleNavigate}
             whatsappNumber={settings.whatsappNumber}
             deliveryFee={settings.deliveryFee}
+            settings={settings}
           />
         );
 
@@ -342,6 +343,7 @@ function MainApp() {
             onNavigate={handleNavigate}
             deliveryFee={settings.deliveryFee}
             freeDeliveryThreshold={settings.freeDeliveryThreshold}
+            settings={settings}
           />
         );
 

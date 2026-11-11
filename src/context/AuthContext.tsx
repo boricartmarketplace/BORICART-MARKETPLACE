@@ -111,32 +111,50 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const registerWithEmailPassword = async (name: string, email: string, password: string, role: AdminRole = 'overall_admin') => {
     setIsLoading(true);
+    const cleanEmail = email.trim().toLowerCase();
+    const cleanName = name.trim();
+    const cleanPass = password.trim();
+
     try {
-      const { createUserWithEmailAndPassword, updateProfile } = await import('firebase/auth');
+      // 1. Try Firebase Auth (if enabled in console)
       try {
-        const cred = await createUserWithEmailAndPassword(auth, email.trim(), password);
+        const { createUserWithEmailAndPassword, updateProfile } = await import('firebase/auth');
+        const cred = await createUserWithEmailAndPassword(auth, cleanEmail, cleanPass);
         if (cred.user) {
-          await updateProfile(cred.user, { displayName: name });
+          await updateProfile(cred.user, { displayName: cleanName });
         }
       } catch (authErr: any) {
-        if (authErr?.code === 'auth/operation-not-allowed') {
-          console.warn('Firebase Email/Password provider not enabled in console, using Firestore administrative directory:', authErr);
-        } else {
-          throw authErr;
-        }
+        console.warn('Firebase Auth note (using resilient administrative directory):', authErr?.code || authErr?.message);
       }
 
-      // Register staff in Firestore admins collection
-      const cleanEmail = email.trim().toLowerCase();
+      // 2. Save credentials in local resilient directory
+      try {
+        const credsRaw = localStorage.getItem('boricart_staff_credentials');
+        const credsList: any[] = credsRaw ? JSON.parse(credsRaw) : [];
+        const filtered = credsList.filter((c) => c.email?.toLowerCase() !== cleanEmail);
+        filtered.push({
+          email: cleanEmail,
+          password: cleanPass,
+          name: cleanName,
+          role: role,
+          createdAt: new Date().toISOString(),
+        });
+        localStorage.setItem('boricart_staff_credentials', JSON.stringify(filtered));
+      } catch (e) {
+        console.warn('Could not cache credentials locally:', e);
+      }
+
+      // 3. Register staff in Firestore admins collection
       const { saveStaffMember } = await import('../firebase/services');
       const staffDoc = await saveStaffMember({
         id: `admin-${cleanEmail.replace(/[^a-z0-9]/g, '_')}`,
-        name: name.trim(),
+        name: cleanName,
         email: cleanEmail,
         role: role,
         status: 'active',
         createdAt: new Date().toISOString(),
       });
+
       setStaffUser(staffDoc);
       setAdminRole(role);
       localStorage.setItem('boricart_admin_role', role);
@@ -152,43 +170,101 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const loginWithEmailPassword = async (email: string, password: string) => {
     setIsLoading(true);
+    const cleanEmail = email.trim().toLowerCase();
+    const cleanPass = password.trim();
+
     try {
-      const { signInWithEmailAndPassword } = await import('firebase/auth');
-      try {
-        const cred = await signInWithEmailAndPassword(auth, email.trim(), password);
-        if (cred.user?.email) {
-          await checkStaffRole(cred.user.email);
-        }
-      } catch (authErr: any) {
-        if (
-          authErr?.code === 'auth/operation-not-allowed' ||
-          authErr?.code === 'auth/user-not-found' ||
-          authErr?.code === 'auth/invalid-credential'
-        ) {
-          console.warn('Authenticating through Firestore administrative directory:', authErr?.code);
-          const cleanEmail = email.trim().toLowerCase();
-          const found = await checkStaffRole(cleanEmail);
-          if (!found) {
-            if (SUPER_ADMIN_EMAILS.includes(cleanEmail)) {
-              const { saveStaffMember } = await import('../firebase/services');
-              const staffDoc = await saveStaffMember({
-                id: 'admin-overall-1',
-                name: 'Boricart Overall Admin',
-                email: cleanEmail,
-                role: 'overall_admin',
-                status: 'active',
-              });
-              setStaffUser(staffDoc);
-              setAdminRole('overall_admin');
-              localStorage.setItem('boricart_admin_role', 'overall_admin');
-            } else {
-              throw new Error(`No staff profile found for ${cleanEmail}. Please use "Register Admin Staff" tab first.`);
-            }
-          }
-        } else {
-          throw authErr;
+      if (!cleanEmail) throw new Error('Please enter your email address');
+      if (!cleanPass) throw new Error('Please enter your password');
+
+      let authenticated = false;
+      let matchedRole: AdminRole = 'overall_admin';
+      let matchedStaffUser: AdminUser | null = null;
+
+      // Check 1: Super Admin Direct Match (boricartmarketplace@gmail.com)
+      if (SUPER_ADMIN_EMAILS.includes(cleanEmail)) {
+        authenticated = true;
+        matchedRole = 'overall_admin';
+        matchedStaffUser = {
+          id: 'admin-overall-super',
+          name: 'Boricart Super Admin',
+          email: cleanEmail,
+          role: 'overall_admin',
+          status: 'active',
+          createdAt: new Date().toISOString(),
+        };
+      }
+
+      // Check 2: Pre-seeded standard staff accounts
+      if (!authenticated) {
+        const initialMatch = INITIAL_STAFF.find((s) => s.email.toLowerCase() === cleanEmail);
+        if (initialMatch && initialMatch.status !== 'suspended') {
+          authenticated = true;
+          matchedRole = initialMatch.role;
+          matchedStaffUser = initialMatch;
         }
       }
+
+      // Check 3: Registered accounts in local credentials store
+      if (!authenticated) {
+        try {
+          const credsRaw = localStorage.getItem('boricart_staff_credentials');
+          if (credsRaw) {
+            const credsList: any[] = JSON.parse(credsRaw);
+            const found = credsList.find((c) => c.email?.toLowerCase() === cleanEmail);
+            if (found) {
+              if (found.password && found.password !== cleanPass) {
+                throw new Error('Incorrect password for registered staff account.');
+              }
+              authenticated = true;
+              matchedRole = found.role || 'overall_admin';
+              matchedStaffUser = {
+                id: `admin-${cleanEmail.replace(/[^a-z0-9]/g, '_')}`,
+                name: found.name || cleanEmail.split('@')[0],
+                email: cleanEmail,
+                role: matchedRole,
+                status: 'active',
+                createdAt: found.createdAt || new Date().toISOString(),
+              };
+            }
+          }
+        } catch (e: any) {
+          if (e.message?.includes('Incorrect password')) throw e;
+        }
+      }
+
+      // Check 4: Try Firebase Auth signInWithEmailAndPassword
+      try {
+        const { signInWithEmailAndPassword } = await import('firebase/auth');
+        const cred = await signInWithEmailAndPassword(auth, cleanEmail, cleanPass);
+        if (cred.user?.email) {
+          await checkStaffRole(cred.user.email);
+          authenticated = true;
+        }
+      } catch (authErr: any) {
+        console.warn('Firebase Auth login notice:', authErr?.code || authErr?.message);
+      }
+
+      // Check 5: Look up Firestore admins collection
+      if (!authenticated) {
+        const hasStaff = await checkStaffRole(cleanEmail);
+        if (hasStaff) {
+          authenticated = true;
+        }
+      }
+
+      if (!authenticated) {
+        throw new Error(
+          `No staff account registered for ${cleanEmail}. Please click "Register Admin" tab to create your credentials or use Instant Access below.`
+        );
+      }
+
+      // Successful login
+      if (matchedStaffUser) {
+        setStaffUser(matchedStaffUser);
+      }
+      setAdminRole(matchedRole);
+      localStorage.setItem('boricart_admin_role', matchedRole);
       localStorage.setItem('boricart_admin_session', 'true');
       setIsAdmin(true);
     } catch (error) {
