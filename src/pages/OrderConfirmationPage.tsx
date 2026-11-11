@@ -8,6 +8,7 @@ import {
   ArrowRight,
   Printer,
   MessageCircle,
+  Gift,
 } from 'lucide-react';
 import { Order } from '../types';
 import { formatNaira } from '../firebase/services';
@@ -161,7 +162,18 @@ export const OrderConfirmationPage: React.FC<OrderConfirmationPageProps> = ({
                   />
                   <div>
                     <p className="font-bold text-sm text-[#333333]">{item.productName}</p>
-                    <p className="text-xs text-gray-400">
+                    {item.packageTitle && (
+                      <p className="text-xs font-semibold text-amber-700">
+                        {item.packageTitle}
+                      </p>
+                    )}
+                    {item.gift && (
+                      <div className="inline-flex items-center gap-1.5 text-xs font-black text-emerald-800 bg-emerald-100 border border-emerald-300 px-2.5 py-0.5 rounded-lg mt-1">
+                        <Gift className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                        <span>🎁 Free Gift: {item.gift}</span>
+                      </div>
+                    )}
+                    <p className="text-xs text-gray-400 mt-0.5">
                       {item.quantity} × {formatNaira(item.price)}
                     </p>
                   </div>

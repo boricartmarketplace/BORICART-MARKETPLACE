@@ -16,8 +16,9 @@ import {
   HelpCircle,
   ChevronDown,
   ChevronUp,
+  Gift,
 } from 'lucide-react';
-import { Product, Category, ProductReview, ProductFaq } from '../../types';
+import { Product, Category, ProductReview, ProductFaq, ProductPackageOffer } from '../../types';
 import { slugify, uploadProductImage } from '../../firebase/services';
 import { generateSalesPageWithAI } from '../../services/aiSalesPageService';
 
@@ -85,6 +86,48 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
   const [reviewsList, setReviewsList] = useState<ProductReview[]>([]);
   const [faqsList, setFaqsList] = useState<ProductFaq[]>([]);
 
+  // Package Offers & Bundle Deals State (Buy 1, Buy 2, Buy 3 + Free Gifts)
+  const [packageOffers, setPackageOffers] = useState<ProductPackageOffer[]>([]);
+
+  const createDefaultPackageOffers = (price: number): ProductPackageOffer[] => {
+    const p = price > 0 ? price : 35000;
+    return [
+      {
+        id: 'offer-1',
+        title: 'Buy 1 Piece (Single Pack)',
+        units: 1,
+        price: p,
+        originalPrice: Math.round(p * 1.3),
+        badge: 'Standard Starter Pack',
+        gift: '',
+        isFreeDelivery: false,
+        isPopular: false,
+      },
+      {
+        id: 'offer-2',
+        title: 'Buy 2 Pieces (Double Pack - Most Popular)',
+        units: 2,
+        price: Math.round(p * 0.92) * 2,
+        originalPrice: Math.round(p * 1.3) * 2,
+        badge: '🔥 MOST POPULAR',
+        gift: 'Free Extra Attachment + Scrub Cloth',
+        isFreeDelivery: true,
+        isPopular: true,
+      },
+      {
+        id: 'offer-3',
+        title: 'Buy 3 Pieces (Family Pack - Best Value)',
+        units: 3,
+        price: Math.round(p * 0.85) * 3,
+        originalPrice: Math.round(p * 1.3) * 3,
+        badge: '⚡ BEST VALUE',
+        gift: 'Free 2 Extra Attachments + VIP Gift Bag',
+        isFreeDelivery: true,
+        isPopular: false,
+      },
+    ];
+  };
+
   // AI Generator state
   const [isGeneratingAI, setIsGeneratingAI] = useState(false);
   const [aiSuccessMessage, setAiSuccessMessage] = useState<string | null>(null);
@@ -150,6 +193,12 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
       setGuaranteeText(product.guaranteeText || '100% Cash on Delivery: Inspect your parcel upon arrival before paying.');
       setReviewsList(product.reviewsList || []);
       setFaqsList(product.faqsList || []);
+      if (product.packageOffers && product.packageOffers.length > 0) {
+        setPackageOffers(product.packageOffers);
+      } else {
+        const base = product.promotionalPrice || product.regularPrice || 35000;
+        setPackageOffers(createDefaultPackageOffers(base));
+      }
     } else {
       // Defaults for new product
       setName('');
@@ -193,6 +242,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
       setGuaranteeText('100% Cash on Delivery: Inspect your package with the courier before paying.');
       setReviewsList([]);
       setFaqsList([]);
+      setPackageOffers(createDefaultPackageOffers(35000));
     }
     setErrorMessage(null);
     setAiSuccessMessage(null);
@@ -320,6 +370,77 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
     setFaqsList(faqsList.filter((f) => f.id !== id));
   };
 
+  // Package Deals & Bundle Offers Handlers
+  const handleAutoCalculateOffers = () => {
+    const base = Number(promotionalPrice) || Number(regularPrice) || 35000;
+    setPackageOffers([
+      {
+        id: packageOffers[0]?.id || 'offer-1',
+        title: packageOffers[0]?.title || 'Buy 1 Piece (Single Pack)',
+        units: 1,
+        price: base,
+        originalPrice: Math.round(base * 1.3),
+        badge: packageOffers[0]?.badge || 'Standard Starter Pack',
+        gift: packageOffers[0]?.gift || '',
+        isFreeDelivery: Boolean(packageOffers[0]?.isFreeDelivery),
+        isPopular: false,
+      },
+      {
+        id: packageOffers[1]?.id || 'offer-2',
+        title: packageOffers[1]?.title || 'Buy 2 Pieces (Double Pack - Most Popular)',
+        units: 2,
+        price: Math.round(base * 0.92) * 2,
+        originalPrice: Math.round(base * 1.3) * 2,
+        badge: packageOffers[1]?.badge || '🔥 MOST POPULAR',
+        gift: packageOffers[1]?.gift || 'Free Extra Attachment + Scrub Cloth',
+        isFreeDelivery: true,
+        isPopular: true,
+      },
+      {
+        id: packageOffers[2]?.id || 'offer-3',
+        title: packageOffers[2]?.title || 'Buy 3 Pieces (Family Pack - Best Value)',
+        units: 3,
+        price: Math.round(base * 0.85) * 3,
+        originalPrice: Math.round(base * 1.3) * 3,
+        badge: packageOffers[2]?.badge || '⚡ BEST VALUE',
+        gift: packageOffers[2]?.gift || 'Free 2 Extra Attachments + VIP Gift Bag',
+        isFreeDelivery: true,
+        isPopular: false,
+      },
+    ]);
+  };
+
+  const handleAddPackageOffer = () => {
+    const nextUnits = packageOffers.length + 1;
+    const base = Number(promotionalPrice) || Number(regularPrice) || 35000;
+    const newOffer: ProductPackageOffer = {
+      id: `offer-${Date.now()}`,
+      title: `Buy ${nextUnits} Pieces (Special Bundle)`,
+      units: nextUnits,
+      price: Math.round(base * 0.8) * nextUnits,
+      originalPrice: Math.round(base * 1.3) * nextUnits,
+      badge: `Special Tier ${nextUnits}`,
+      gift: 'Free Special Deluxe Gift',
+      isFreeDelivery: true,
+      isPopular: false,
+    };
+    setPackageOffers([...packageOffers, newOffer]);
+  };
+
+  const handleUpdatePackageOffer = (id: string, field: keyof ProductPackageOffer, value: any) => {
+    setPackageOffers(
+      packageOffers.map((o) => (o.id === id ? { ...o, [field]: value } : o))
+    );
+  };
+
+  const handleRemovePackageOffer = (id: string) => {
+    if (packageOffers.length <= 1) {
+      setErrorMessage('You must keep at least one package offer (e.g. Buy 1).');
+      return;
+    }
+    setPackageOffers(packageOffers.filter((o) => o.id !== id));
+  };
+
   // Handle local file selection
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -443,6 +564,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
         guaranteeText: guaranteeText.trim() || undefined,
         reviewsList: reviewsList.length > 0 ? reviewsList : undefined,
         faqsList: faqsList.length > 0 ? faqsList : undefined,
+        packageOffers: packageOffers.length > 0 ? packageOffers : undefined,
       });
 
       onClose();
@@ -859,6 +981,244 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                         <span className="text-[11px] text-gray-500">Overrides location rates for this product.</span>
                       </div>
                     )}
+                  </div>
+                </div>
+
+                {/* Package Offers & Bundle Deals Configurator (Buy 1, Buy 2, Buy 3 + Free Gifts) */}
+                <div className="space-y-4 p-5 bg-gradient-to-br from-amber-50/70 via-white to-orange-50/40 rounded-2xl border-2 border-amber-300 shadow-xs">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-amber-200">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-xl bg-[#F5A623] text-black font-black flex items-center justify-center shadow-xs">
+                        <Gift className="w-4 h-4 text-gray-950" />
+                      </div>
+                      <div>
+                        <h4 className="font-black text-sm text-gray-900 flex items-center gap-2">
+                          <span>Set Offer Deals & Free Gifts (Buy 1, Buy 2, Buy 3)</span>
+                          <span className="text-[10px] font-black bg-emerald-100 text-emerald-800 px-2.5 py-0.5 rounded-full uppercase">
+                            Alloh Brands Style
+                          </span>
+                        </h4>
+                        <p className="text-[11px] text-gray-600">
+                          Set bundle prices for 1, 2, or 3 items, and use the <strong>Gift Column</strong> to specify free gifts included with each package.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={handleAutoCalculateOffers}
+                        className="inline-flex items-center gap-1.5 bg-amber-100 hover:bg-amber-200 text-amber-950 text-xs font-black px-3 py-2 rounded-xl border border-amber-300 transition-colors shadow-2xs"
+                        title="Auto-calculate Buy 1, Buy 2, Buy 3 pricing and discounts based on current selling price"
+                      >
+                        <Sparkles className="w-3.5 h-3.5 text-amber-600" />
+                        <span>Auto-Calculate Buy 1, 2, 3</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleAddPackageOffer}
+                        className="inline-flex items-center gap-1 bg-gray-900 hover:bg-black text-white text-xs font-black px-3 py-2 rounded-xl transition-colors shadow-2xs"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>Add Package</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* List of Offers */}
+                  <div className="space-y-3.5">
+                    {packageOffers.map((offer, index) => (
+                      <div
+                        key={offer.id || index}
+                        className={`p-4 rounded-xl border-2 transition-all ${
+                          offer.isPopular
+                            ? 'bg-amber-50/60 border-amber-400 ring-2 ring-amber-300/40 shadow-xs'
+                            : 'bg-white border-gray-200 hover:border-gray-300'
+                        }`}
+                      >
+                        {/* Header bar of package card */}
+                        <div className="flex items-center justify-between pb-2 mb-3 border-b border-gray-100">
+                          <div className="flex items-center gap-2">
+                            <span className="w-6 h-6 rounded-lg bg-gray-900 text-white text-xs font-black flex items-center justify-center">
+                              #{index + 1}
+                            </span>
+                            <span className="text-xs font-black text-gray-900">
+                              Package Tier {index + 1}: {offer.units} {offer.units === 1 ? 'Piece' : 'Pieces'}
+                            </span>
+                            {offer.isPopular && (
+                              <span className="text-[10px] font-black bg-[#F5A623] text-black px-2 py-0.5 rounded-full uppercase">
+                                🔥 Most Popular
+                              </span>
+                            )}
+                          </div>
+
+                          <div className="flex items-center gap-3">
+                            <label className="flex items-center gap-1.5 text-[11px] font-bold text-gray-700 cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={Boolean(offer.isPopular)}
+                                onChange={(e) =>
+                                  handleUpdatePackageOffer(offer.id, 'isPopular', e.target.checked)
+                                }
+                                className="w-3.5 h-3.5 text-[#F5A623] rounded focus:ring-[#F5A623]"
+                              />
+                              <span>Most Popular</span>
+                            </label>
+
+                            <label className="flex items-center gap-1.5 text-[11px] font-bold text-emerald-700 cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={Boolean(offer.isFreeDelivery)}
+                                onChange={(e) =>
+                                  handleUpdatePackageOffer(offer.id, 'isFreeDelivery', e.target.checked)
+                                }
+                                className="w-3.5 h-3.5 text-emerald-600 rounded focus:ring-emerald-500"
+                              />
+                              <span>Free Shipping</span>
+                            </label>
+
+                            {packageOffers.length > 1 && (
+                              <button
+                                type="button"
+                                onClick={() => handleRemovePackageOffer(offer.id)}
+                                className="p-1 text-gray-400 hover:text-red-500 rounded-lg hover:bg-red-50 transition-colors"
+                                title="Delete offer tier"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Top row: Title, Units, Selling Price, Struck Price */}
+                        <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
+                          <div className="sm:col-span-5">
+                            <label className="block text-[11px] font-bold text-gray-700 mb-1">
+                              Offer Title on Sales Page
+                            </label>
+                            <input
+                              type="text"
+                              value={offer.title}
+                              onChange={(e) =>
+                                handleUpdatePackageOffer(offer.id, 'title', e.target.value)
+                              }
+                              placeholder="e.g. Buy 2 Pieces (Double Pack)"
+                              className="w-full text-xs font-bold bg-white border border-gray-300 rounded-lg px-2.5 py-2 focus:border-[#F5A623] focus:outline-none text-gray-900"
+                            />
+                          </div>
+
+                          <div className="sm:col-span-2">
+                            <label className="block text-[11px] font-bold text-gray-700 mb-1">
+                              Units (Qty)
+                            </label>
+                            <input
+                              type="number"
+                              min="1"
+                              value={offer.units}
+                              onChange={(e) =>
+                                handleUpdatePackageOffer(
+                                  offer.id,
+                                  'units',
+                                  Number(e.target.value) || 1
+                                )
+                              }
+                              className="w-full text-xs font-black bg-white border border-gray-300 rounded-lg px-2 py-2 focus:border-[#F5A623] focus:outline-none text-center text-gray-900"
+                            />
+                          </div>
+
+                          <div className="sm:col-span-3">
+                            <label className="block text-[11px] font-bold text-gray-700 mb-1">
+                              Selling Price (₦) <span className="text-red-500">*</span>
+                            </label>
+                            <div className="relative">
+                              <span className="absolute left-2.5 top-2 text-xs font-black text-[#D98200]">
+                                ₦
+                              </span>
+                              <input
+                                type="number"
+                                min="0"
+                                value={offer.price}
+                                onChange={(e) =>
+                                  handleUpdatePackageOffer(
+                                    offer.id,
+                                    'price',
+                                    Number(e.target.value) || 0
+                                  )
+                                }
+                                className="w-full text-xs font-black bg-white border border-gray-300 rounded-lg pl-7 pr-2.5 py-2 focus:border-[#F5A623] focus:outline-none text-gray-950"
+                              />
+                            </div>
+                          </div>
+
+                          <div className="sm:col-span-2">
+                            <label className="block text-[11px] font-bold text-gray-700 mb-1">
+                              Struck Price (₦)
+                            </label>
+                            <div className="relative">
+                              <span className="absolute left-2 top-2 text-xs font-bold text-gray-400">₦</span>
+                              <input
+                                type="number"
+                                min="0"
+                                value={offer.originalPrice || ''}
+                                onChange={(e) =>
+                                  handleUpdatePackageOffer(
+                                    offer.id,
+                                    'originalPrice',
+                                    e.target.value ? Number(e.target.value) : undefined
+                                  )
+                                }
+                                placeholder="Struck out"
+                                className="w-full text-xs bg-white border border-gray-300 rounded-lg pl-6 pr-2 py-2 focus:border-[#F5A623] focus:outline-none text-gray-500"
+                              />
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Bottom row: THE DEDICATED FREE GIFT COLUMN & PROMO BADGE */}
+                        <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 mt-3 pt-3 border-t border-dashed border-gray-200">
+                          {/* DEDICATED GIFT COLUMN */}
+                          <div className="sm:col-span-8 bg-emerald-50/70 p-2.5 rounded-xl border border-emerald-300">
+                            <label className="block text-[11px] font-black text-emerald-900 mb-1 flex items-center gap-1.5">
+                              <Gift className="w-4 h-4 text-emerald-600 shrink-0" />
+                              <span>GIFT COLUMN: Included Free Gift for this Package</span>
+                            </label>
+                            <input
+                              type="text"
+                              value={offer.gift || ''}
+                              onChange={(e) =>
+                                handleUpdatePackageOffer(offer.id, 'gift', e.target.value)
+                              }
+                              placeholder="e.g. Free Extra Brush Head + Magic Scrub Sponge (or leave empty)"
+                              className="w-full text-xs font-bold bg-white border border-emerald-300 rounded-lg px-3 py-2 text-emerald-950 placeholder:text-gray-400 focus:border-emerald-600 focus:outline-none shadow-2xs"
+                            />
+                            <p className="text-[10px] text-emerald-700 mt-1 font-medium">
+                              Display this gift prominently on the customer sales page and on the order dispatch slip so riders include the gift when packing.
+                            </p>
+                          </div>
+
+                          {/* Promotional Badge */}
+                          <div className="sm:col-span-4 flex flex-col justify-between">
+                            <div>
+                              <label className="block text-[11px] font-bold text-gray-700 mb-1">
+                                Promo Badge Text (Optional)
+                              </label>
+                              <input
+                                type="text"
+                                value={offer.badge || ''}
+                                onChange={(e) =>
+                                  handleUpdatePackageOffer(offer.id, 'badge', e.target.value)
+                                }
+                                placeholder="e.g. 🔥 MOST POPULAR"
+                                className="w-full text-xs font-semibold bg-white border border-gray-300 rounded-lg px-2.5 py-2 focus:border-[#F5A623] focus:outline-none"
+                              />
+                            </div>
+                            <span className="text-[10px] text-gray-500 mt-1 block">
+                              Highlights this card to increase click rate
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 </div>
 

@@ -969,8 +969,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                               {ord.status}
                             </span>
                           </div>
-                          <p className="text-xs text-gray-500 mt-0.5">
-                            {ord.customerName} • {ord.city}, {ord.state}
+                          <p className="text-xs text-gray-500 mt-0.5 flex items-center gap-1.5 flex-wrap">
+                            <span>{ord.customerName} • {ord.city}, {ord.state}</span>
+                            {ord.items?.[0]?.gift && (
+                              <span className="text-[10px] font-bold text-emerald-800 bg-emerald-100 px-1.5 py-0.5 rounded">
+                                🎁 {ord.items[0].gift}
+                              </span>
+                            )}
                           </p>
                         </div>
                         <div className="text-right">
@@ -1438,6 +1443,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                           <td className="py-3.5 px-4">
                             <p className="font-bold text-gray-900">{ord.customerName}</p>
                             <p className="text-gray-400 font-mono text-[11px]">{ord.phone}</p>
+                            {ord.items?.[0]?.gift && (
+                              <span className="inline-block mt-0.5 text-[10px] font-bold text-emerald-800 bg-emerald-100 px-1.5 py-0.5 rounded">
+                                🎁 {ord.items[0].gift}
+                              </span>
+                            )}
                           </td>
 
                           <td className="py-3.5 px-4">

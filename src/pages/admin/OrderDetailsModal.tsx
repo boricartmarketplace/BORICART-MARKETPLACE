@@ -8,6 +8,7 @@ import {
   MessageCircle,
   AlertCircle,
   CheckCircle2,
+  Gift,
 } from 'lucide-react';
 import { Order, OrderStatus, PaymentStatus } from '../../types';
 import { formatNaira } from '../../firebase/services';
@@ -202,7 +203,18 @@ export const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
                       />
                       <div>
                         <p className="font-bold text-gray-900">{item.productName}</p>
-                        <p className="text-gray-400">
+                        {item.packageTitle && (
+                          <p className="text-[11px] font-bold text-amber-700">
+                            Package: {item.packageTitle}
+                          </p>
+                        )}
+                        {item.gift && (
+                          <div className="inline-flex items-center gap-1.5 text-[11px] font-black text-emerald-800 bg-emerald-100 border border-emerald-300 px-2 py-0.5 rounded-lg mt-0.5">
+                            <Gift className="w-3 h-3 text-emerald-600 shrink-0" />
+                            <span>Free Gift to Pack: {item.gift}</span>
+                          </div>
+                        )}
+                        <p className="text-gray-400 mt-0.5">
                           Qty: {item.quantity} × {formatNaira(item.price)}
                         </p>
                       </div>

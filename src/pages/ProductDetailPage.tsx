@@ -52,9 +52,24 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
 }) => {
   const [selectedImage, setSelectedImage] = useState<string>(product.mainImage);
   const [quantity, setQuantity] = useState<number>(1);
-  const [selectedPackage, setSelectedPackage] = useState<number>(1);
+  const [selectedPackage, setSelectedPackage] = useState<string | number>(() => {
+    if (product.packageOffers && product.packageOffers.length > 0) {
+      const pop = product.packageOffers.find((p) => p.isPopular) || product.packageOffers[0];
+      return pop.id;
+    }
+    return 2;
+  });
   const [activeFaq, setActiveFaq] = useState<number | null>(0);
   const [copiedLink, setCopiedLink] = useState(false);
+
+  // Sync selected package when product data updates
+  useEffect(() => {
+    if (product.packageOffers && product.packageOffers.length > 0) {
+      const pop = product.packageOffers.find((p) => p.isPopular) || product.packageOffers[0];
+      setSelectedPackage(pop.id);
+      setQuantity(pop.units || 1);
+    }
+  }, [product.packageOffers]);
 
   // Live Countdown Timer state
   const timerHoursInitial = product.timerHours || 24;
@@ -168,48 +183,74 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
 
   const isOutOfStock = product.stockStatus === 'out_of_stock' || product.stockQuantity === 0;
 
-  // Package Deals Configuration (Alloh Brands signature offer bundles)
-  // Package 1: 1 unit
-  // Package 2: 2 units (extra discount + Free Delivery)
-  // Package 3: 3 units (maximum discount + Free Delivery)
-  const packageDeals = [
-    {
-      id: 1,
-      title: '1 Piece (Single Pack)',
-      subtext: 'Standard Personal Pack',
-      units: 1,
-      pricePerUnit: basePrice,
-      totalPrice: basePrice,
-      badge: 'Standard Offer',
-      popular: false,
-      freeDelivery: false,
-    },
-    {
-      id: 2,
-      title: '2 Pieces (Double Pack)',
-      subtext: '1 for You + 1 for Family / Backup',
-      units: 2,
-      pricePerUnit: Math.round(basePrice * 0.92),
-      totalPrice: Math.round(basePrice * 0.92) * 2,
-      badge: `🔥 MOST POPULAR • SAVE EXTRA ₦${(basePrice * 2 - Math.round(basePrice * 0.92) * 2).toLocaleString()}`,
-      popular: true,
-      freeDelivery: true,
-    },
-    {
-      id: 3,
-      title: '3 Pieces (Family / Trio Pack)',
-      subtext: 'Complete Household Set + Extra Discount',
-      units: 3,
-      pricePerUnit: Math.round(basePrice * 0.85),
-      totalPrice: Math.round(basePrice * 0.85) * 3,
-      badge: `⚡ BEST VALUE • SAVE EXTRA ₦${(basePrice * 3 - Math.round(basePrice * 0.85) * 3).toLocaleString()}`,
-      popular: false,
-      freeDelivery: true,
-    },
-  ];
+  // Package Deals Configuration (Dynamic from Admin or smart tiered fallbacks)
+  const packageDeals =
+    product.packageOffers && product.packageOffers.length > 0
+      ? product.packageOffers.map((off, idx) => ({
+          id: off.id || `offer-${idx + 1}`,
+          title: off.title,
+          subtext:
+            off.units === 1
+              ? 'Standard Personal Starter Pack'
+              : off.units === 2
+              ? 'Double Pack • 1 for You + 1 for Backup'
+              : `${off.units} Pieces • Complete Family / Household Pack`,
+          units: off.units || 1,
+          pricePerUnit: Math.round(off.price / (off.units || 1)),
+          totalPrice: off.price,
+          originalPrice: off.originalPrice,
+          badge: off.badge,
+          gift: off.gift,
+          popular: Boolean(off.isPopular),
+          freeDelivery: Boolean(off.isFreeDelivery),
+        }))
+      : [
+          {
+            id: 'offer-1',
+            title: '1 Piece (Single Pack)',
+            subtext: 'Standard Personal Pack',
+            units: 1,
+            pricePerUnit: basePrice,
+            totalPrice: basePrice,
+            originalPrice: Math.round(basePrice * 1.3),
+            badge: 'Standard Starter Pack',
+            gift: '',
+            popular: false,
+            freeDelivery: false,
+          },
+          {
+            id: 'offer-2',
+            title: 'Buy 2 Pieces (Double Pack - Most Popular)',
+            subtext: '1 for You + 1 for Family / Backup',
+            units: 2,
+            pricePerUnit: Math.round(basePrice * 0.92),
+            totalPrice: Math.round(basePrice * 0.92) * 2,
+            originalPrice: Math.round(basePrice * 1.3) * 2,
+            badge: `🔥 MOST POPULAR • SAVE EXTRA ₦${(basePrice * 2 - Math.round(basePrice * 0.92) * 2).toLocaleString()}`,
+            gift: 'Free Extra Attachment + Scrub Cloth',
+            popular: true,
+            freeDelivery: true,
+          },
+          {
+            id: 'offer-3',
+            title: 'Buy 3 Pieces (Family Pack - Best Value)',
+            subtext: 'Complete Household Set + Extra Discount',
+            units: 3,
+            pricePerUnit: Math.round(basePrice * 0.85),
+            totalPrice: Math.round(basePrice * 0.85) * 3,
+            originalPrice: Math.round(basePrice * 1.3) * 3,
+            badge: `⚡ BEST VALUE • SAVE EXTRA ₦${(basePrice * 3 - Math.round(basePrice * 0.85) * 3).toLocaleString()}`,
+            gift: 'Free 2 Extra Attachments + VIP Gift Bag',
+            popular: false,
+            freeDelivery: true,
+          },
+        ];
 
   // Active selected deal
-  const currentDeal = packageDeals.find((d) => d.id === selectedPackage) || packageDeals[0];
+  const currentDeal =
+    packageDeals.find((d) => String(d.id) === String(selectedPackage)) ||
+    packageDeals.find((d) => d.popular) ||
+    packageDeals[0];
   const itemSubtotal = currentDeal.totalPrice;
 
   // Location delivery fee calculation
@@ -219,15 +260,15 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
     itemSubtotal,
     product
   );
-  // Free delivery if bundle is package 2/3 or calculated fee is 0
+  // Free delivery if bundle is marked free delivery or calculated fee is 0
   const isFreeDelivery = currentDeal.freeDelivery || calculatedFee === 0;
   const currentDeliveryFee = isFreeDelivery ? 0 : calculatedFee;
   const totalAmountDue = itemSubtotal + currentDeliveryFee;
 
   // Select package handler
-  const handleSelectPackage = (pkgId: number) => {
+  const handleSelectPackage = (pkgId: string | number) => {
     setSelectedPackage(pkgId);
-    const chosen = packageDeals.find((d) => d.id === pkgId);
+    const chosen = packageDeals.find((d) => String(d.id) === String(pkgId));
     if (chosen) {
       setQuantity(chosen.units);
     }
@@ -346,12 +387,14 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
             price: currentDeal.pricePerUnit,
             quantity: currentDeal.units,
             sku: product.sku,
+            packageTitle: currentDeal.title,
+            gift: currentDeal.gift || undefined,
           },
         ],
         subtotal: itemSubtotal,
         deliveryFee: currentDeliveryFee,
         totalAmount: totalAmountDue,
-        notes: `Package: ${currentDeal.title}. Delivery Preference: ${orderForm.deliveryDay}. ${orderForm.notes ? 'Notes: ' + orderForm.notes.trim() : ''}`,
+        notes: `Package: ${currentDeal.title}.${currentDeal.gift ? ` Included Free Gift: ${currentDeal.gift}.` : ''} Delivery Preference: ${orderForm.deliveryDay}. ${orderForm.notes ? 'Notes: ' + orderForm.notes.trim() : ''}`,
         utmSource: attribution?.utmSource,
         utmMedium: attribution?.utmMedium,
         utmCampaign: attribution?.utmCampaign,
@@ -898,14 +941,14 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
 
               <div className="space-y-2.5">
                 {packageDeals.map((deal) => {
-                  const isSelected = selectedPackage === deal.id;
+                  const isSelected = String(selectedPackage) === String(deal.id);
                   return (
                     <div
                       key={deal.id}
                       onClick={() => handleSelectPackage(deal.id)}
-                      className={`p-4 rounded-2xl border-2 transition-all cursor-pointer relative ${
+                      className={`p-4 sm:p-5 rounded-2xl border-2 transition-all cursor-pointer relative ${
                         isSelected
-                          ? 'bg-[#222222] border-[#F5A623] shadow-lg ring-2 ring-[#F5A623]/30'
+                          ? 'bg-[#222222] border-[#F5A623] shadow-xl ring-2 ring-[#F5A623]/40'
                           : 'bg-[#181818] border-gray-800 hover:border-gray-600'
                       }`}
                     >
@@ -916,7 +959,7 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
                             name="packageSelection"
                             checked={isSelected}
                             onChange={() => handleSelectPackage(deal.id)}
-                            className="w-4 h-4 text-[#F5A623] focus:ring-[#F5A623]"
+                            className="w-4 h-4 text-[#F5A623] focus:ring-[#F5A623] cursor-pointer"
                           />
                           <div>
                             <span className="font-extrabold text-sm sm:text-base text-white block">
@@ -928,24 +971,39 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
                           </div>
                         </div>
 
-                        <div className="text-right">
+                        <div className="text-right shrink-0">
+                          {deal.originalPrice && deal.originalPrice > deal.totalPrice && (
+                            <span className="text-xs text-gray-500 line-through block font-semibold">
+                              {formatNaira(deal.originalPrice)}
+                            </span>
+                          )}
                           <span className="text-base sm:text-xl font-black text-[#F5A623] block">
                             {formatNaira(deal.totalPrice)}
                           </span>
                           {deal.freeDelivery && (
-                            <span className="text-[10px] font-black text-emerald-400 block uppercase">
+                            <span className="text-[10px] font-black text-emerald-400 block uppercase tracking-wide">
                               + Free Shipping
                             </span>
                           )}
                         </div>
                       </div>
 
+                      {/* DEDICATED FREE GIFT HIGHLIGHT BOX */}
+                      {deal.gift && (
+                        <div className="mt-3 flex items-center gap-2 bg-gradient-to-r from-emerald-950/80 via-emerald-900/50 to-emerald-950/80 border border-emerald-500/60 text-emerald-300 px-3 py-2 rounded-xl text-xs font-black shadow-inner">
+                          <Gift className="w-4 h-4 text-emerald-400 shrink-0 animate-pulse" />
+                          <span>🎁 INCLUDED FREE GIFT: {deal.gift}</span>
+                        </div>
+                      )}
+
                       {deal.badge && (
-                        <span className={`inline-block text-[10px] font-black px-2.5 py-0.5 rounded-full mt-2 uppercase ${
-                          deal.popular
-                            ? 'bg-amber-500/20 text-[#F5A623] border border-amber-500/50'
-                            : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/50'
-                        }`}>
+                        <span
+                          className={`inline-block text-[10px] font-black px-2.5 py-0.5 rounded-full mt-2.5 uppercase tracking-wide ${
+                            deal.popular
+                              ? 'bg-amber-500/20 text-[#F5A623] border border-amber-500/50'
+                              : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/50'
+                          }`}
+                        >
                           {deal.badge}
                         </span>
                       )}
@@ -1068,6 +1126,15 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
                 <span>Selected Package:</span>
                 <span className="text-white font-bold">{currentDeal.title}</span>
               </div>
+              {currentDeal.gift && (
+                <div className="flex justify-between items-center text-emerald-300 bg-emerald-950/60 border border-emerald-500/40 p-2.5 rounded-xl">
+                  <span className="flex items-center gap-1.5 font-bold">
+                    <Gift className="w-4 h-4 text-emerald-400 shrink-0" />
+                    <span>Free Gift Included:</span>
+                  </span>
+                  <span className="font-black text-right">{currentDeal.gift}</span>
+                </div>
+              )}
               <div className="flex justify-between text-gray-400">
                 <span>Package Price:</span>
                 <span>{formatNaira(itemSubtotal)}</span>

@@ -14,6 +14,18 @@ export interface ProductFaq {
   answer: string;
 }
 
+export interface ProductPackageOffer {
+  id: string; // e.g. "offer-1", "offer-2", "offer-3"
+  title: string; // e.g. "Buy 1 Piece", "Buy 2 Pieces (Most Popular)", "Buy 3 Pieces (Family Pack)"
+  units: number; // 1, 2, 3
+  price: number; // Bundle selling price in NGN
+  originalPrice?: number; // Struck-through original price in NGN
+  badge?: string; // e.g. "Standard Offer", "🔥 Most Popular", "⚡ Best Value"
+  gift?: string; // Column for custom gift e.g. "Free Microfiber Sponge + Extra Brush Head"
+  isFreeDelivery?: boolean; // When true, delivery is free for this package
+  isPopular?: boolean; // Highlight badge
+}
+
 export interface Product {
   id: string;
   name: string;
@@ -64,6 +76,7 @@ export interface Product {
   freeDeliveryNote?: string; // Delivery incentive copy
   deliveryFeeOverride?: number; // Optional specific delivery fee in NGN for this product
   isFreeDelivery?: boolean; // When true, free delivery is automatically applied for this product
+  packageOffers?: ProductPackageOffer[]; // Configurable Buy 1, Buy 2, Buy 3 bundle packages with gifts
 
   createdAt: string;
   updatedAt: string;
@@ -100,6 +113,8 @@ export interface OrderItem {
   adSpend?: number;
   quantity: number;
   sku?: string;
+  packageTitle?: string;
+  gift?: string; // Included promotional gift for this package
 }
 
 export type OrderStatus =
