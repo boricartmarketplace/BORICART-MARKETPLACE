@@ -5,6 +5,7 @@ import dotenv from 'dotenv';
 import { createServer as createViteServer } from 'vite';
 import { GoogleGenAI, Type } from '@google/genai';
 import { INITIAL_PRODUCTS } from './src/data/initialCatalog';
+import { injectProductMeta } from './src/utils/seoMetaInjector';
 
 dotenv.config();
 
@@ -324,134 +325,7 @@ function extractProductSlug(urlPath: string): string | null {
   return null;
 }
 
-// Helper to inject OpenGraph & SEO tags into HTML before serving
-function injectProductMeta(template: string, product: any, reqHost: string, reqUrl: string): string {
-  const cleanName = product.name || 'Everyday Problem Solver';
-  const metaDesc = (
-    product.shortDescription ||
-    product.headline ||
-    product.description ||
-    `Order ${cleanName} online at Boricart Nigeria. Up to 35% discount, Pay on Delivery, and express nationwide shipping.`
-  )
-    .replace(/\r?\n|\r/g, ' ')
-    .replace(/["']/g, '')
-    .slice(0, 160)
-    .trim();
 
-  const domain = reqHost.includes('localhost')
-    ? `http://${reqHost}`
-    : `https://${reqHost.includes('boricart.com.ng') ? 'www.boricart.com.ng' : reqHost}`;
-
-  let rawImg = product.mainImage || (Array.isArray(product.images) && product.images[0]) || '/assets/aistudio/image_11326346.png';
-  let absoluteImg = rawImg;
-  if (!rawImg.startsWith('http://') && !rawImg.startsWith('https://')) {
-    absoluteImg = `${domain}${rawImg.startsWith('/') ? '' : '/'}${rawImg}`;
-  }
-
-  const canonicalUrl = `${domain}/product/${product.slug || product.id}`;
-  const price = product.promotionalPrice || product.regularPrice || 4500;
-
-  const escapeHtml = (str: string) =>
-    str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-  const escapeJson = (str: string) =>
-    str.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n');
-
-  let output = template;
-
-  // 1. Replace Title
-  output = output.replace(
-    /<title>.*?<\/title>/i,
-    `<title>${escapeHtml(cleanName)} — Buy Online & Pay on Delivery | Boricart</title>`
-  );
-
-  // 2. Replace Description
-  output = output.replace(
-    /<meta\s+name=["']description["']\s+content=["'].*?["']\s*\/?>/i,
-    `<meta name="description" content="${escapeHtml(metaDesc)}" />`
-  );
-
-  // 3. Replace Canonical
-  output = output.replace(
-    /<link\s+rel=["']canonical["']\s+href=["'].*?["']\s*\/?>/i,
-    `<link rel="canonical" href="${escapeHtml(canonicalUrl)}" />`
-  );
-
-  // 4. Replace OpenGraph Title & Description
-  output = output.replace(
-    /<meta\s+property=["']og:title["']\s+content=["'].*?["']\s*\/?>/i,
-    `<meta property="og:title" content="${escapeHtml(cleanName)} — Boricart Nigeria" />`
-  );
-  output = output.replace(
-    /<meta\s+property=["']og:description["']\s+content=["'].*?["']\s*\/?>/i,
-    `<meta property="og:description" content="${escapeHtml(metaDesc)}" />`
-  );
-
-  // 5. Replace OpenGraph URL & Type
-  output = output.replace(
-    /<meta\s+property=["']og:url["']\s+content=["'].*?["']\s*\/?>/i,
-    `<meta property="og:url" content="${escapeHtml(canonicalUrl)}" />`
-  );
-  output = output.replace(
-    /<meta\s+property=["']og:type["']\s+content=["'].*?["']\s*\/?>/i,
-    `<meta property="og:type" content="product" />\n    <meta property="product:price:amount" content="${price}" />\n    <meta property="product:price:currency" content="NGN" />`
-  );
-
-  // 6. Replace OpenGraph Image
-  output = output.replace(
-    /<meta\s+property=["']og:image["']\s+content=["'].*?["']\s*\/?>/i,
-    `<meta property="og:image" content="${escapeHtml(absoluteImg)}" />\n    <meta property="og:image:secure_url" content="${escapeHtml(absoluteImg)}" />\n    <meta property="og:image:width" content="800" />\n    <meta property="og:image:height" content="800" />\n    <meta property="og:image:alt" content="${escapeHtml(cleanName)}" />`
-  );
-
-  // 7. Replace Twitter metadata
-  output = output.replace(
-    /<meta\s+name=["']twitter:title["']\s+content=["'].*?["']\s*\/?>/i,
-    `<meta name="twitter:title" content="${escapeHtml(cleanName)} — Boricart Nigeria" />`
-  );
-  output = output.replace(
-    /<meta\s+name=["']twitter:description["']\s+content=["'].*?["']\s*\/?>/i,
-    `<meta name="twitter:description" content="${escapeHtml(metaDesc)}" />`
-  );
-  output = output.replace(
-    /<meta\s+name=["']twitter:image["']\s+content=["'].*?["']\s*\/?>/i,
-    `<meta name="twitter:image" content="${escapeHtml(absoluteImg)}" />`
-  );
-
-  // 8. Inject Schema.org JSON-LD
-  const schemaMarkup = `
-    <!-- Schema.org Product Structured Data for Social Cards & Search Engines -->
-    <script type="application/ld+json">
-      {
-        "@context": "https://schema.org",
-        "@type": "Product",
-        "name": "${escapeJson(cleanName)}",
-        "image": ["${escapeJson(absoluteImg)}"],
-        "description": "${escapeJson(metaDesc)}",
-        "sku": "${escapeJson(product.sku || 'BC-' + (product.id || 'PROD'))}",
-        "brand": {
-          "@type": "Brand",
-          "name": "Boricart"
-        },
-        "offers": {
-          "@type": "Offer",
-          "url": "${escapeJson(canonicalUrl)}",
-          "priceCurrency": "NGN",
-          "price": "${price}",
-          "priceValidUntil": "2027-12-31",
-          "itemCondition": "https://schema.org/NewCondition",
-          "availability": "https://schema.org/InStock",
-          "seller": {
-            "@type": "Organization",
-            "name": "Boricart Nigeria"
-          }
-        }
-      }
-    </script>
-  `;
-
-  output = output.replace('</head>', `${schemaMarkup}\n</head>`);
-
-  return output;
-}
 
 // Mount Vite or serve static assets
 async function startServer() {

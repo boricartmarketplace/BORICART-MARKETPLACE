@@ -28,6 +28,7 @@ import {
 } from './firebase/services';
 import { DEFAULT_SETTINGS, INITIAL_PRODUCTS, INITIAL_CATEGORIES } from './data/initialCatalog';
 import { initPixels, trackPageView, captureAdAttribution } from './services/pixelService';
+import { formatSocialImage } from './utils/seoMetaInjector';
 
 // Parse initial route from URL path, query, or hash
 function parseRouteFromLocation(isAdminUser: boolean): { route: string; params: Record<string, any> } {
@@ -267,19 +268,30 @@ function MainApp() {
           activeProd.description ||
           `Order ${activeProd.name} online at Boricart Nigeria with Cash on Delivery.`
         ).replace(/\r?\n|\r/g, ' ').slice(0, 160);
-        const prodImg = activeProd.mainImage || 'https://www.boricart.com.ng/assets/aistudio/image_11326346.png';
-        const prodUrl = `https://www.boricart.com.ng/product/${activeProd.slug}`;
+        const socialImg = formatSocialImage(
+          activeProd.mainImage || (Array.isArray(activeProd.images) ? activeProd.images[0] : undefined),
+          'https://www.boricart.com.ng',
+          activeProd.name
+        );
+        const prodUrl = `https://www.boricart.com.ng/product/${activeProd.slug || activeProd.id}`;
 
         document.title = prodTitle;
         setMeta('meta[name="description"]', 'content', metaDesc);
         setMeta('meta[property="og:title"]', 'content', `${activeProd.name} — Boricart Nigeria`);
         setMeta('meta[property="og:description"]', 'content', metaDesc);
-        setMeta('meta[property="og:image"]', 'content', prodImg);
+        setMeta('meta[property="og:image"]', 'content', socialImg.url);
+        setMeta('meta[property="og:image:secure_url"]', 'content', socialImg.secureUrl);
+        setMeta('meta[property="og:image:type"]', 'content', socialImg.type);
+        setMeta('meta[property="og:image:width"]', 'content', String(socialImg.width));
+        setMeta('meta[property="og:image:height"]', 'content', String(socialImg.height));
+        setMeta('meta[property="og:image:alt"]', 'content', socialImg.alt);
         setMeta('meta[property="og:url"]', 'content', prodUrl);
         setMeta('meta[property="og:type"]', 'content', 'product');
+        setMeta('meta[name="twitter:card"]', 'content', 'summary_large_image');
         setMeta('meta[name="twitter:title"]', 'content', `${activeProd.name} — Boricart Nigeria`);
         setMeta('meta[name="twitter:description"]', 'content', metaDesc);
-        setMeta('meta[name="twitter:image"]', 'content', prodImg);
+        setMeta('meta[name="twitter:image"]', 'content', socialImg.url);
+        setMeta('meta[name="twitter:image:alt"]', 'content', socialImg.alt);
       }
     } else if (currentRoute === 'category') {
       const activeCat = categories.find((c) => c.slug === routeParams.slug || c.id === routeParams.categoryId);

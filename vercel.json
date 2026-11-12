@@ -6,6 +6,39 @@
       "destination": "/api/$1"
     },
     {
+      "source": "/product/:slug",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": ".*(WhatsApp|facebookexternalhit|Facebot|Twitterbot|TelegramBot|LinkedInBot|Slackbot|SkypeUriPreview|Discordbot|Applebot).*"
+        }
+      ],
+      "destination": "/api/og-crawler?slug=:slug"
+    },
+    {
+      "source": "/products/:slug",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": ".*(WhatsApp|facebookexternalhit|Facebot|Twitterbot|TelegramBot|LinkedInBot|Slackbot|SkypeUriPreview|Discordbot|Applebot).*"
+        }
+      ],
+      "destination": "/api/og-crawler?slug=:slug"
+    },
+    {
+      "source": "/p/:slug",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": ".*(WhatsApp|facebookexternalhit|Facebot|Twitterbot|TelegramBot|LinkedInBot|Slackbot|SkypeUriPreview|Discordbot|Applebot).*"
+        }
+      ],
+      "destination": "/api/og-crawler?slug=:slug"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }
