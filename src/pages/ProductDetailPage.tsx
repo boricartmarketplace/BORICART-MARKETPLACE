@@ -61,6 +61,8 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
   });
   const [activeFaq, setActiveFaq] = useState<number | null>(0);
   const [copiedLink, setCopiedLink] = useState(false);
+  const [shareMenuOpen, setShareMenuOpen] = useState(false);
+  const [isCheckoutVisible, setIsCheckoutVisible] = useState(false);
 
   // Sync selected package when product data updates
   useEffect(() => {
@@ -101,12 +103,27 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
   const [orderError, setOrderError] = useState<string | null>(null);
 
   // Smooth scroll to in-page order form / #checkout
-  const scrollToOrderForm = () => {
+  const scrollToOrderForm = (behavior?: ScrollBehavior | React.MouseEvent) => {
+    const scrollMode: ScrollBehavior = typeof behavior === 'string' ? behavior : 'smooth';
     const el = document.getElementById('checkout') || document.getElementById('order-now-section');
     if (el) {
-      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      el.scrollIntoView({ behavior: scrollMode, block: 'start' });
     }
   };
+
+  // Track checkout section visibility to toggle sticky conversion bar
+  useEffect(() => {
+    const el = document.getElementById('checkout');
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        setIsCheckoutVisible(entry.isIntersecting);
+      },
+      { threshold: 0.1 }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [product.id]);
 
   // Trigger pixel ViewContent on mount / product change
   useEffect(() => {
@@ -114,14 +131,33 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
     setSelectedImage(product.mainImage);
   }, [product.id]);
 
-  // Handle #checkout hash navigation on initial page load
+  // Handle immediate auto-scroll to offer form on ad landing or link clicks
   useEffect(() => {
-    if (window.location.hash === '#checkout' || window.location.hash === '#order') {
-      setTimeout(() => {
-        scrollToOrderForm();
-      }, 400);
+    const hasOfferHash =
+      window.location.hash === '#checkout' ||
+      window.location.hash === '#order' ||
+      window.location.hash === '#order-form';
+    const hasAdQuery =
+      window.location.search.includes('checkout') ||
+      window.location.search.includes('offer') ||
+      window.location.search.includes('order') ||
+      window.location.search.includes('utm_source') ||
+      window.location.search.includes('fbclid') ||
+      window.location.search.includes('gclid') ||
+      window.location.search.includes('ttclid') ||
+      window.location.search.includes('ad=1');
+
+    if (hasOfferHash || hasAdQuery) {
+      // Immediate scroll attempt
+      scrollToOrderForm('smooth');
+      const timer1 = setTimeout(() => scrollToOrderForm('smooth'), 180);
+      const timer2 = setTimeout(() => scrollToOrderForm('smooth'), 450);
+      return () => {
+        clearTimeout(timer1);
+        clearTimeout(timer2);
+      };
     }
-  }, []);
+  }, [product.id]);
 
   // Countdown timer effect
   useEffect(() => {
@@ -465,33 +501,83 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
             </div>
           </div>
 
-          <div className="flex items-center gap-2 sm:gap-3">
-            <button
-              onClick={() => {
-                const url = generateShareUrl(`/product/${product.slug}`);
-                if (navigator.clipboard) {
-                  navigator.clipboard.writeText(url);
-                  setCopiedLink(true);
-                  setTimeout(() => setCopiedLink(false), 2000);
-                }
-              }}
-              className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-xs font-bold transition-colors cursor-pointer"
-            >
-              {copiedLink ? (
-                <>
-                  <Check className="w-3.5 h-3.5 text-emerald-600" />
-                  <span className="text-emerald-700">Link Copied</span>
-                </>
-              ) : (
-                <>
-                  <Share2 className="w-3.5 h-3.5" />
-                  <span>Share</span>
-                </>
+          <div className="flex items-center gap-2 sm:gap-3 relative">
+            <div className="relative">
+              <button
+                onClick={() => setShareMenuOpen(!shareMenuOpen)}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-800 rounded-lg text-xs font-bold transition-colors cursor-pointer"
+                title="Share this product page"
+              >
+                <Share2 className="w-3.5 h-3.5" />
+                <span>Share</span>
+              </button>
+
+              {shareMenuOpen && (
+                <div className="absolute right-0 top-full mt-1.5 w-60 bg-white rounded-2xl shadow-2xl border border-gray-200 p-2 z-50 animate-in fade-in zoom-in-95">
+                  <div className="text-[10px] font-black uppercase text-gray-400 px-3 py-1 tracking-wider">
+                    Share Link with Card Preview
+                  </div>
+
+                  <button
+                    onClick={() => {
+                      const url = generateShareUrl(`/product/${product.slug}#checkout`);
+                      if (navigator.clipboard) {
+                        navigator.clipboard.writeText(url);
+                        setCopiedLink(true);
+                        setTimeout(() => {
+                          setCopiedLink(false);
+                          setShareMenuOpen(false);
+                        }, 1800);
+                      }
+                    }}
+                    className="w-full text-left px-3 py-2 text-xs font-bold text-gray-800 hover:bg-amber-50 hover:text-[#D98200] rounded-xl flex items-center gap-2.5 transition-colors cursor-pointer"
+                  >
+                    {copiedLink ? (
+                      <>
+                        <Check className="w-4 h-4 text-emerald-600 stroke-[3]" />
+                        <span className="text-emerald-700">Ad Link Copied!</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="w-4 h-4 text-gray-500" />
+                        <span>Copy Ad Link (Direct to Offer)</span>
+                      </>
+                    )}
+                  </button>
+
+                  <a
+                    href={`https://api.whatsapp.com/send?text=${encodeURIComponent(
+                      `🔥 *${product.name}*\n\n${(product.shortDescription || product.headline || '').slice(0, 140)}\n\n👉 Pay on Delivery & Order Here: ${generateShareUrl(`/product/${product.slug}#checkout`)}`
+                    )}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={() => setShareMenuOpen(false)}
+                    className="w-full text-left px-3 py-2 text-xs font-bold text-gray-800 hover:bg-emerald-50 hover:text-emerald-700 rounded-xl flex items-center gap-2.5 transition-colors cursor-pointer"
+                  >
+                    <MessageCircle className="w-4 h-4 text-emerald-600" />
+                    <span>Share on WhatsApp</span>
+                  </a>
+
+                  <a
+                    href={`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(
+                      generateShareUrl(`/product/${product.slug}`)
+                    )}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={() => setShareMenuOpen(false)}
+                    className="w-full text-left px-3 py-2 text-xs font-bold text-gray-800 hover:bg-blue-50 hover:text-blue-700 rounded-xl flex items-center gap-2.5 transition-colors cursor-pointer"
+                  >
+                    <svg className="w-4 h-4 fill-[#1877F2]" viewBox="0 0 24 24">
+                      <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
+                    </svg>
+                    <span>Share on Facebook</span>
+                  </a>
+                </div>
               )}
-            </button>
+            </div>
 
             <button
-              onClick={scrollToOrderForm}
+              onClick={() => scrollToOrderForm('smooth')}
               className="bg-[#F5A623] hover:bg-[#D98200] text-black font-black text-xs sm:text-sm px-4 py-2 sm:py-2.5 rounded-xl shadow-xs uppercase tracking-wider flex items-center gap-1.5 cursor-pointer animate-pulse"
             >
               <ShoppingBag className="w-4 h-4" />
@@ -533,12 +619,34 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
           </div>
         </div>
 
+        {/* ================= AD CONVERSION QUICK JUMP BANNER ================= */}
+        <div className="bg-gradient-to-r from-amber-50 via-orange-50/80 to-yellow-50 border-2 border-[#F5A623] rounded-2xl p-4 sm:p-5 shadow-xs text-center space-y-2.5">
+          <div className="inline-flex items-center gap-1.5 text-xs font-black text-[#D98200] uppercase tracking-wider">
+            <Flame className="w-4 h-4 text-[#D98200] fill-current animate-bounce" />
+            <span>⚡ TODAY'S DIRECT PROMOTIONAL SALE • 100% PAY ON DELIVERY</span>
+          </div>
+          <p className="text-xs sm:text-sm text-gray-800 font-bold max-w-xl mx-auto leading-relaxed">
+            Ready to claim your discount package? Skip the long text and fill the 60-second delivery form below with ₦0 upfront payment.
+          </p>
+          <div className="pt-0.5">
+            <button
+              onClick={() => scrollToOrderForm('smooth')}
+              className="inline-flex items-center gap-2 bg-[#F5A623] hover:bg-[#D98200] text-black hover:text-white font-black text-xs sm:text-sm px-6 py-2.5 rounded-xl shadow-md transition-all cursor-pointer transform hover:scale-102"
+            >
+              <span>Go Directly to Package Deals & Order Form</span>
+              <ArrowDown className="w-4 h-4 stroke-[3]" />
+            </button>
+          </div>
+        </div>
+
         {/* Hero Visual Media Showcase */}
         <div className="bg-white rounded-3xl p-4 sm:p-6 border-2 border-gray-200 shadow-md space-y-4">
           <div className="aspect-square bg-gray-50 rounded-2xl border border-gray-100 overflow-hidden relative group flex items-center justify-center p-2">
             <img
               src={selectedImage}
               alt={product.name}
+              loading="eager"
+              fetchPriority="high"
               className="w-full h-full object-contain"
             />
             {isDiscounted && (
@@ -1214,24 +1322,44 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
       )}
 
       {/* =========================================================================
-          10. FIXED STICKY MOBILE ORDER BAR (Smooth jump to #checkout)
+          10. FIXED STICKY CONVERSION BAR (Immediately jumps directly to #checkout)
          ========================================================================= */}
-      <div className="sm:hidden fixed bottom-0 inset-x-0 bg-white/95 backdrop-blur-md border-t border-gray-200 px-4 py-2.5 z-40 flex items-center justify-between gap-3 shadow-2xl">
-        <div>
-          <span className="text-[10px] text-gray-500 font-bold block uppercase tracking-wider">Pay on Delivery</span>
-          <span className="text-base font-black text-[#B91C1C] leading-none">
-            {formatNaira(totalAmountDue)}
-          </span>
-        </div>
+      {!isCheckoutVisible && (
+        <div className="fixed bottom-0 inset-x-0 bg-white/95 backdrop-blur-md border-t-2 border-[#F5A623] px-4 py-2.5 z-40 shadow-2xl transition-all animate-in fade-in slide-in-from-bottom-2">
+          <div className="max-w-3xl mx-auto flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5 overflow-hidden">
+              <img
+                src={selectedImage}
+                alt={product.name}
+                loading="lazy"
+                className="w-10 h-10 rounded-lg object-contain bg-gray-50 border border-gray-200 shrink-0"
+              />
+              <div className="min-w-0">
+                <span className="font-black text-xs sm:text-sm text-gray-900 block truncate">
+                  {product.name}
+                </span>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs sm:text-sm font-black text-[#B91C1C]">
+                    {formatNaira(totalAmountDue)}
+                  </span>
+                  <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                    Pay on Delivery
+                  </span>
+                </div>
+              </div>
+            </div>
 
-        <button
-          onClick={scrollToOrderForm}
-          disabled={isOutOfStock}
-          className="flex-1 bg-[#F5A623] hover:bg-[#D98200] disabled:bg-gray-400 text-black font-black py-3 px-4 rounded-xl text-xs uppercase tracking-wider shadow-md text-center cursor-pointer animate-pulse"
-        >
-          {isOutOfStock ? 'Sold Out' : 'ORDER NOW (PAY ON ARRIVAL)'}
-        </button>
-      </div>
+            <button
+              onClick={() => scrollToOrderForm('smooth')}
+              disabled={isOutOfStock}
+              className="bg-[#F5A623] hover:bg-[#D98200] disabled:bg-gray-400 text-black font-black py-2.5 sm:py-3 px-4 sm:px-6 rounded-xl text-xs sm:text-sm uppercase tracking-wider shadow-md text-center cursor-pointer shrink-0 animate-pulse flex items-center gap-1.5"
+            >
+              <span>{isOutOfStock ? 'Sold Out' : 'Order Now • Pay on Arrival'}</span>
+              <ArrowDown className="w-3.5 h-3.5 stroke-[3]" />
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -24,8 +24,9 @@ import {
   getCategories,
   getOrders,
   getStoreSettings,
+  getInitialFastProducts,
 } from './firebase/services';
-import { DEFAULT_SETTINGS, INITIAL_PRODUCTS } from './data/initialCatalog';
+import { DEFAULT_SETTINGS, INITIAL_PRODUCTS, INITIAL_CATEGORIES } from './data/initialCatalog';
 import { initPixels, trackPageView, captureAdAttribution } from './services/pixelService';
 
 // Parse initial route from URL path, query, or hash
@@ -151,11 +152,11 @@ function MainApp() {
 
   const [currentRoute, setCurrentRoute] = useState<string>(() => parseRouteFromLocation(false).route);
   const [routeParams, setRouteParams] = useState<Record<string, any>>(() => parseRouteFromLocation(false).params);
-  const [products, setProducts] = useState<Product[]>([]);
-  const [categories, setCategories] = useState<Category[]>([]);
+  const [products, setProducts] = useState<Product[]>(getInitialFastProducts);
+  const [categories, setCategories] = useState<Category[]>(() => INITIAL_CATEGORIES);
   const [orders, setOrders] = useState<Order[]>([]);
   const [settings, setSettings] = useState<StoreSettings>(DEFAULT_SETTINGS);
-  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
 
   // Initialize pixels when settings update
   useEffect(() => {
@@ -243,11 +244,42 @@ function MainApp() {
   // Dynamic SEO & Title synchronization
   useEffect(() => {
     const baseTitle = 'BORICART — Everyday Solutions. Better Living.';
+    const setMeta = (selector: string, attr: string, val: string) => {
+      let el = document.querySelector(selector);
+      if (!el) {
+        el = document.createElement('meta');
+        const match = selector.match(/\[(.*?)="?(.*?)"?\]/);
+        if (match) {
+          el.setAttribute(match[1], match[2]);
+          document.head.appendChild(el);
+        }
+      }
+      el.setAttribute(attr, val);
+    };
 
     if (currentRoute === 'product') {
       const activeProd = products.find((p) => p.slug === routeParams.slug || p.id === routeParams.id);
       if (activeProd) {
-        document.title = `${activeProd.name} — Buy Online & Pay on Delivery | Boricart`;
+        const prodTitle = `${activeProd.name} — Buy Online & Pay on Delivery | Boricart`;
+        const metaDesc = (
+          activeProd.shortDescription ||
+          activeProd.headline ||
+          activeProd.description ||
+          `Order ${activeProd.name} online at Boricart Nigeria with Cash on Delivery.`
+        ).replace(/\r?\n|\r/g, ' ').slice(0, 160);
+        const prodImg = activeProd.mainImage || 'https://www.boricart.com.ng/assets/aistudio/image_11326346.png';
+        const prodUrl = `https://www.boricart.com.ng/product/${activeProd.slug}`;
+
+        document.title = prodTitle;
+        setMeta('meta[name="description"]', 'content', metaDesc);
+        setMeta('meta[property="og:title"]', 'content', `${activeProd.name} — Boricart Nigeria`);
+        setMeta('meta[property="og:description"]', 'content', metaDesc);
+        setMeta('meta[property="og:image"]', 'content', prodImg);
+        setMeta('meta[property="og:url"]', 'content', prodUrl);
+        setMeta('meta[property="og:type"]', 'content', 'product');
+        setMeta('meta[name="twitter:title"]', 'content', `${activeProd.name} — Boricart Nigeria`);
+        setMeta('meta[name="twitter:description"]', 'content', metaDesc);
+        setMeta('meta[name="twitter:image"]', 'content', prodImg);
       }
     } else if (currentRoute === 'category') {
       const activeCat = categories.find((c) => c.slug === routeParams.slug || c.id === routeParams.categoryId);

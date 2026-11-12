@@ -413,12 +413,35 @@ export async function saveProduct(productData: Partial<Product> & { name: string
   try {
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('boricart:product_saved', { detail: productToSave }));
+      // Notify server for instant OpenGraph social media preview cards
+      fetch('/api/sync-product-meta', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(productToSave),
+      }).catch(() => {});
     }
   } catch (e) {
     // ignore
   }
 
   return productToSave;
+}
+
+/**
+ * Fast synchronous loader for instantaneous product rendering (0ms load time)
+ */
+export function getInitialFastProducts(): Product[] {
+  if (typeof window === 'undefined') return INITIAL_PRODUCTS;
+  try {
+    const deletedIds = getDeletedProductIds();
+    const cached = getLocalCache<Product[]>(STORAGE_KEY_PRODUCTS);
+    if (cached && Array.isArray(cached) && cached.length > 0) {
+      return cached.filter((p) => !deletedIds.has(p.id) && !deletedIds.has(p.slug));
+    }
+    return INITIAL_PRODUCTS.filter((p) => !deletedIds.has(p.id) && !deletedIds.has(p.slug));
+  } catch {
+    return INITIAL_PRODUCTS;
+  }
 }
 
 export async function deleteProduct(id: string): Promise<void> {

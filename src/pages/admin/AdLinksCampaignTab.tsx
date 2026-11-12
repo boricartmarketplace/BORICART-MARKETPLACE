@@ -83,7 +83,7 @@ export const AdLinksCampaignTab: React.FC<AdLinksCampaignTabProps> = ({
   let targetPath = '/';
   if (builderTargetType === 'product') {
     const p = products.find((x) => x.id === selectedProductId) || products[0];
-    targetPath = p ? `/product/${p.slug}` : '/shop';
+    targetPath = p ? `/product/${p.slug}#checkout` : '/shop';
   } else if (builderTargetType === 'category') {
     targetPath = `/category/${selectedCategorySlug || categories[0]?.slug || ''}`;
   } else {
@@ -416,10 +416,10 @@ export const AdLinksCampaignTab: React.FC<AdLinksCampaignTabProps> = ({
             </thead>
             <tbody className="divide-y divide-gray-100">
               {filteredProducts.map((prod) => {
-                const cleanUrl = generateShareUrl(`/product/${prod.slug}`, { customDomain, campaignPlatform: 'clean' });
-                const fbUrl = generateShareUrl(`/product/${prod.slug}`, { customDomain, campaignPlatform: 'facebook' });
-                const ttUrl = generateShareUrl(`/product/${prod.slug}`, { customDomain, campaignPlatform: 'tiktok' });
-                const gUrl = generateShareUrl(`/product/${prod.slug}`, { customDomain, campaignPlatform: 'google' });
+                const cleanUrl = generateShareUrl(`/product/${prod.slug}#checkout`, { customDomain, campaignPlatform: 'clean' });
+                const fbUrl = generateShareUrl(`/product/${prod.slug}#checkout`, { customDomain, campaignPlatform: 'facebook' });
+                const ttUrl = generateShareUrl(`/product/${prod.slug}#checkout`, { customDomain, campaignPlatform: 'tiktok' });
+                const gUrl = generateShareUrl(`/product/${prod.slug}#checkout`, { customDomain, campaignPlatform: 'google' });
 
                 return (
                   <tr key={prod.id} className="hover:bg-gray-50/60 transition-colors">

@@ -4,6 +4,7 @@ import fs from 'fs';
 import dotenv from 'dotenv';
 import { createServer as createViteServer } from 'vite';
 import { GoogleGenAI, Type } from '@google/genai';
+import { INITIAL_PRODUCTS } from './src/data/initialCatalog';
 
 dotenv.config();
 
@@ -11,6 +12,46 @@ const app = express();
 const PORT = Number(process.env.PORT) || 3000;
 
 app.use(express.json({ limit: '10mb' }));
+
+// In-memory catalog cache for dynamic OpenGraph and SEO social media crawling
+const productsCatalogMap = new Map<string, any>();
+
+// Seed with INITIAL_PRODUCTS
+for (const p of INITIAL_PRODUCTS) {
+  if (p.slug) productsCatalogMap.set(p.slug.toLowerCase(), p);
+  if (p.id) productsCatalogMap.set(p.id.toLowerCase(), p);
+}
+
+// Load custom products from disk cache if exists
+const CUSTOM_PRODUCTS_PATH = path.resolve('custom_products_cache.json');
+try {
+  if (fs.existsSync(CUSTOM_PRODUCTS_PATH)) {
+    const raw = fs.readFileSync(CUSTOM_PRODUCTS_PATH, 'utf-8');
+    const customList = JSON.parse(raw);
+    if (Array.isArray(customList)) {
+      for (const p of customList) {
+        if (p.slug) productsCatalogMap.set(p.slug.toLowerCase(), p);
+        if (p.id) productsCatalogMap.set(p.id.toLowerCase(), p);
+      }
+    }
+  }
+} catch (e) {
+  console.warn('Could not read custom_products_cache.json:', e);
+}
+
+function findProductBySlug(slug: string) {
+  const clean = slug.toLowerCase().trim();
+  if (productsCatalogMap.has(clean)) {
+    return productsCatalogMap.get(clean);
+  }
+  // Try searching with dashes converted to spaces
+  for (const p of productsCatalogMap.values()) {
+    if (p.slug && p.slug.toLowerCase() === clean) return p;
+    if (p.id && p.id.toLowerCase() === clean) return p;
+    if (p.name && p.name.toLowerCase().replace(/\s+/g, '-') === clean) return p;
+  }
+  return null;
+}
 
 // Initialize GoogleGenAI client (Server-side only)
 const ai = new GoogleGenAI({
@@ -253,18 +294,241 @@ Requirements:
   }
 });
 
+// Endpoint to sync newly created/updated product meta for social sharing
+app.post('/api/sync-product-meta', (req, res) => {
+  try {
+    const product = req.body;
+    if (product && (product.slug || product.id)) {
+      if (product.slug) productsCatalogMap.set(product.slug.toLowerCase(), product);
+      if (product.id) productsCatalogMap.set(product.id.toLowerCase(), product);
+
+      const allList = Array.from(new Set(Array.from(productsCatalogMap.values())));
+      fs.writeFileSync(CUSTOM_PRODUCTS_PATH, JSON.stringify(allList, null, 2), 'utf-8');
+      res.json({ success: true, count: productsCatalogMap.size });
+      return;
+    }
+    res.status(400).json({ error: 'Product data required' });
+  } catch (err: any) {
+    console.error('Error syncing product meta:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Helper to extract product slug from URL
+function extractProductSlug(urlPath: string): string | null {
+  const cleanPath = urlPath.split('?')[0].split('#')[0];
+  const match = cleanPath.match(/^\/(?:product|products|p)\/([^/]+)/i);
+  if (match && match[1]) {
+    return decodeURIComponent(match[1]);
+  }
+  return null;
+}
+
+// Helper to inject OpenGraph & SEO tags into HTML before serving
+function injectProductMeta(template: string, product: any, reqHost: string, reqUrl: string): string {
+  const cleanName = product.name || 'Everyday Problem Solver';
+  const metaDesc = (
+    product.shortDescription ||
+    product.headline ||
+    product.description ||
+    `Order ${cleanName} online at Boricart Nigeria. Up to 35% discount, Pay on Delivery, and express nationwide shipping.`
+  )
+    .replace(/\r?\n|\r/g, ' ')
+    .replace(/["']/g, '')
+    .slice(0, 160)
+    .trim();
+
+  const domain = reqHost.includes('localhost')
+    ? `http://${reqHost}`
+    : `https://${reqHost.includes('boricart.com.ng') ? 'www.boricart.com.ng' : reqHost}`;
+
+  let rawImg = product.mainImage || (Array.isArray(product.images) && product.images[0]) || '/assets/aistudio/image_11326346.png';
+  let absoluteImg = rawImg;
+  if (!rawImg.startsWith('http://') && !rawImg.startsWith('https://')) {
+    absoluteImg = `${domain}${rawImg.startsWith('/') ? '' : '/'}${rawImg}`;
+  }
+
+  const canonicalUrl = `${domain}/product/${product.slug || product.id}`;
+  const price = product.promotionalPrice || product.regularPrice || 4500;
+
+  const escapeHtml = (str: string) =>
+    str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  const escapeJson = (str: string) =>
+    str.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n');
+
+  let output = template;
+
+  // 1. Replace Title
+  output = output.replace(
+    /<title>.*?<\/title>/i,
+    `<title>${escapeHtml(cleanName)} — Buy Online & Pay on Delivery | Boricart</title>`
+  );
+
+  // 2. Replace Description
+  output = output.replace(
+    /<meta\s+name=["']description["']\s+content=["'].*?["']\s*\/?>/i,
+    `<meta name="description" content="${escapeHtml(metaDesc)}" />`
+  );
+
+  // 3. Replace Canonical
+  output = output.replace(
+    /<link\s+rel=["']canonical["']\s+href=["'].*?["']\s*\/?>/i,
+    `<link rel="canonical" href="${escapeHtml(canonicalUrl)}" />`
+  );
+
+  // 4. Replace OpenGraph Title & Description
+  output = output.replace(
+    /<meta\s+property=["']og:title["']\s+content=["'].*?["']\s*\/?>/i,
+    `<meta property="og:title" content="${escapeHtml(cleanName)} — Boricart Nigeria" />`
+  );
+  output = output.replace(
+    /<meta\s+property=["']og:description["']\s+content=["'].*?["']\s*\/?>/i,
+    `<meta property="og:description" content="${escapeHtml(metaDesc)}" />`
+  );
+
+  // 5. Replace OpenGraph URL & Type
+  output = output.replace(
+    /<meta\s+property=["']og:url["']\s+content=["'].*?["']\s*\/?>/i,
+    `<meta property="og:url" content="${escapeHtml(canonicalUrl)}" />`
+  );
+  output = output.replace(
+    /<meta\s+property=["']og:type["']\s+content=["'].*?["']\s*\/?>/i,
+    `<meta property="og:type" content="product" />\n    <meta property="product:price:amount" content="${price}" />\n    <meta property="product:price:currency" content="NGN" />`
+  );
+
+  // 6. Replace OpenGraph Image
+  output = output.replace(
+    /<meta\s+property=["']og:image["']\s+content=["'].*?["']\s*\/?>/i,
+    `<meta property="og:image" content="${escapeHtml(absoluteImg)}" />\n    <meta property="og:image:secure_url" content="${escapeHtml(absoluteImg)}" />\n    <meta property="og:image:width" content="800" />\n    <meta property="og:image:height" content="800" />\n    <meta property="og:image:alt" content="${escapeHtml(cleanName)}" />`
+  );
+
+  // 7. Replace Twitter metadata
+  output = output.replace(
+    /<meta\s+name=["']twitter:title["']\s+content=["'].*?["']\s*\/?>/i,
+    `<meta name="twitter:title" content="${escapeHtml(cleanName)} — Boricart Nigeria" />`
+  );
+  output = output.replace(
+    /<meta\s+name=["']twitter:description["']\s+content=["'].*?["']\s*\/?>/i,
+    `<meta name="twitter:description" content="${escapeHtml(metaDesc)}" />`
+  );
+  output = output.replace(
+    /<meta\s+name=["']twitter:image["']\s+content=["'].*?["']\s*\/?>/i,
+    `<meta name="twitter:image" content="${escapeHtml(absoluteImg)}" />`
+  );
+
+  // 8. Inject Schema.org JSON-LD
+  const schemaMarkup = `
+    <!-- Schema.org Product Structured Data for Social Cards & Search Engines -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "Product",
+        "name": "${escapeJson(cleanName)}",
+        "image": ["${escapeJson(absoluteImg)}"],
+        "description": "${escapeJson(metaDesc)}",
+        "sku": "${escapeJson(product.sku || 'BC-' + (product.id || 'PROD'))}",
+        "brand": {
+          "@type": "Brand",
+          "name": "Boricart"
+        },
+        "offers": {
+          "@type": "Offer",
+          "url": "${escapeJson(canonicalUrl)}",
+          "priceCurrency": "NGN",
+          "price": "${price}",
+          "priceValidUntil": "2027-12-31",
+          "itemCondition": "https://schema.org/NewCondition",
+          "availability": "https://schema.org/InStock",
+          "seller": {
+            "@type": "Organization",
+            "name": "Boricart Nigeria"
+          }
+        }
+      }
+    </script>
+  `;
+
+  output = output.replace('</head>', `${schemaMarkup}\n</head>`);
+
+  return output;
+}
+
 // Mount Vite or serve static assets
 async function startServer() {
   if (process.env.NODE_ENV === 'production') {
     app.use(express.static(path.resolve('dist')));
+
+    // Intercept product routes in production for OpenGraph previews
+    app.get(['/product/:slug', '/products/:slug', '/p/:slug'], (req, res) => {
+      try {
+        const slug = req.params.slug;
+        const indexPath = path.resolve('dist/index.html');
+        let template = fs.readFileSync(indexPath, 'utf-8');
+
+        let prod = findProductBySlug(slug);
+        if (!prod) {
+          const formattedName = slug
+            .split('-')
+            .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+            .join(' ');
+          prod = {
+            name: formattedName,
+            slug: slug,
+            mainImage: 'https://www.boricart.com.ng/assets/aistudio/image_11326346.png',
+            shortDescription: `Order ${formattedName} online at Boricart Nigeria. Up to 35% discount, Pay on Delivery, and express nationwide shipping.`,
+            regularPrice: 4500,
+          };
+        }
+
+        const host = (req.headers['x-forwarded-host'] as string) || req.headers.host || 'www.boricart.com.ng';
+        const rendered = injectProductMeta(template, prod, host, req.originalUrl);
+        res.status(200).set({ 'Content-Type': 'text/html' }).send(rendered);
+      } catch (err) {
+        res.sendFile(path.resolve('dist/index.html'));
+      }
+    });
+
     app.get('*', (req, res) => {
       res.sendFile(path.resolve('dist/index.html'));
     });
   } else {
     const vite = await createViteServer({
       server: { middlewareMode: true },
-      appType: 'spa',
+      appType: 'custom',
     });
+
+    // Product routes with OpenGraph injection in dev
+    app.get(['/product/:slug', '/products/:slug', '/p/:slug'], async (req, res, next) => {
+      try {
+        const slug = req.params.slug;
+        const indexPath = path.resolve('index.html');
+        let template = fs.readFileSync(indexPath, 'utf-8');
+        template = await vite.transformIndexHtml(req.originalUrl, template);
+
+        let prod = findProductBySlug(slug);
+        if (!prod) {
+          const formattedName = slug
+            .split('-')
+            .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+            .join(' ');
+          prod = {
+            name: formattedName,
+            slug: slug,
+            mainImage: 'https://www.boricart.com.ng/assets/aistudio/image_11326346.png',
+            shortDescription: `Order ${formattedName} online at Boricart Nigeria. Up to 35% discount, Pay on Delivery, and express nationwide shipping.`,
+            regularPrice: 4500,
+          };
+        }
+
+        const host = (req.headers['x-forwarded-host'] as string) || req.headers.host || 'www.boricart.com.ng';
+        template = injectProductMeta(template, prod, host, req.originalUrl);
+        res.status(200).set({ 'Content-Type': 'text/html' }).end(template);
+      } catch (e: any) {
+        vite.ssrFixStacktrace(e);
+        next(e);
+      }
+    });
+
     app.use(vite.middlewares);
 
     // Fallback for any client SPA routes in development
